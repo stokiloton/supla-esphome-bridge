@@ -1,5 +1,6 @@
 #include "supla_esphome_bridge.h"
 #include "esphome/core/log.h"
+#include "esphome/components/wifi/wifi_component.h"
 
 namespace esphome {
 namespace supla_esphome_bridge {
@@ -17,9 +18,16 @@ void SuplaEsphomeBridge::set_location_password(const std::string &hex) {
 
 void SuplaEsphomeBridge::generate_guid_() {
   uint8_t mac[6];
-  WiFi.macAddress(mac);
+  if (wifi::global_wifi_component != nullptr) {
+    wifi::global_wifi_component->get_mac_address(mac);
+  } else {
+    // fallback – wypełnij czymś, żeby GUID nie był pusty
+    for (int i = 0; i < 6; i++) mac[i] = i * 11;
+  }
+
   memset(guid_.guid, 0, sizeof(guid_.guid));
   memcpy(guid_.guid, mac, 6);
+
   uint32_t t = millis();
   memcpy(guid_.guid + 6, &t, sizeof(t));
 }
