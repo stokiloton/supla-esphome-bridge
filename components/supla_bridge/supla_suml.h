@@ -16,12 +16,16 @@ static uint16_t supla_crc16(const uint8_t *data, int len) {
   return crc;
 }
 
+#pragma pack(push, 1)
+
 struct SuplaPacketHeader {
   uint8_t marker[3];   // 'S','U','P'
   uint8_t version;     // 1
   uint16_t data_size;
   uint16_t crc16;
 };
+
+#pragma pack(pop)
 
 inline void supla_prepare_header(SuplaPacketHeader &hdr, uint16_t size, const uint8_t *payload) {
   hdr.marker[0] = 'S';
