@@ -7,6 +7,10 @@ from esphome import automation
 supla_bridge_ns = cg.esphome_ns.namespace("supla_bridge")
 SuplaBridge = supla_bridge_ns.class_("SuplaBridge", cg.Component)
 
+# Nowe klasy triggerów
+SuplaTurnOnTrigger = supla_bridge_ns.class_("SuplaTurnOnTrigger", automation.Trigger.template())
+SuplaTurnOffTrigger = supla_bridge_ns.class_("SuplaTurnOffTrigger", automation.Trigger.template())
+
 CONF_SERVER = "server"
 CONF_USER = "user"
 CONF_PASSWORD = "password"
@@ -39,25 +43,21 @@ async def to_code(config):
     cg.add(var.set_email(config[CONF_USER]))
     cg.add(var.set_password(config[CONF_PASSWORD]))
 
-    # Triggery: SUPLA -> ESPHome
+    # Trigger: SUPLA -> ESPHome
     if CONF_ON_SUPLA_TURN_ON in config:
-        on_turn_on_trigger = cg.new_Pvariable(
-            cg.global_ns.class_("Trigger")()
-        )
-        cg.add(var.set_on_turn_on_trigger(on_turn_on_trigger))
+        trig = cg.new_Pvariable(SuplaTurnOnTrigger)
+        cg.add(var.set_on_turn_on_trigger(trig))
         await automation.build_automation(
-            on_turn_on_trigger,
+            trig,
             [],
             config[CONF_ON_SUPLA_TURN_ON],
         )
 
     if CONF_ON_SUPLA_TURN_OFF in config:
-        on_turn_off_trigger = cg.new_Pvariable(
-            cg.global_ns.class_("Trigger")()
-        )
-        cg.add(var.set_on_turn_off_trigger(on_turn_off_trigger))
+        trig = cg.new_Pvariable(SuplaTurnOffTrigger)
+        cg.add(var.set_on_turn_off_trigger(trig))
         await automation.build_automation(
-            on_turn_off_trigger,
+            trig,
             [],
             config[CONF_ON_SUPLA_TURN_OFF],
         )
