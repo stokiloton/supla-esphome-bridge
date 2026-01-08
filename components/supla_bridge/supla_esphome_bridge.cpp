@@ -13,7 +13,7 @@ namespace supla_esphome_bridge {
 static const char *const TAG = "supla_esphome_bridge";
 
 // ---------------------------------------------------------
-// Helper: HEX dump
+// HEX DUMP
 // ---------------------------------------------------------
 static void hex_dump(const char *prefix, const uint8_t *data, int len) {
   ESP_LOGI(TAG, "%s (%d bytes):", prefix, len);
@@ -28,7 +28,7 @@ static void hex_dump(const char *prefix, const uint8_t *data, int len) {
 }
 
 // ---------------------------------------------------------
-// Password setter
+// PASSWORD PARSER
 // ---------------------------------------------------------
 void SuplaEsphomeBridge::set_location_password(const std::string &hex) {
   memset(location_password_, 0, sizeof(location_password_));
@@ -37,10 +37,12 @@ void SuplaEsphomeBridge::set_location_password(const std::string &hex) {
     std::string byte_str = hex.substr(i, 2);
     location_password_[i / 2] = (uint8_t) strtol(byte_str.c_str(), nullptr, 16);
   }
+
+  hex_dump("LOCATION PASSWORD", location_password_, 16);
 }
 
 // ---------------------------------------------------------
-// GUID generator
+// GUID GENERATOR
 // ---------------------------------------------------------
 void SuplaEsphomeBridge::generate_guid_() {
   uint8_t mac[6];
@@ -57,12 +59,11 @@ void SuplaEsphomeBridge::generate_guid_() {
   uint32_t t = millis();
   memcpy(guid_.guid + 6, &t, sizeof(t));
 
-  ESP_LOGI(TAG, "Generated GUID:");
   hex_dump("GUID", guid_.guid, 16);
 }
 
 // ---------------------------------------------------------
-// Setup
+// SETUP
 // ---------------------------------------------------------
 void SuplaEsphomeBridge::setup() {
   ESP_LOGI(TAG, "Setup SUPLA bridge");
@@ -70,7 +71,7 @@ void SuplaEsphomeBridge::setup() {
 }
 
 // ---------------------------------------------------------
-// Connect + Register
+// CONNECT + REGISTER
 // ---------------------------------------------------------
 bool SuplaEsphomeBridge::connect_and_register_() {
   if (server_.empty()) {
@@ -95,8 +96,6 @@ bool SuplaEsphomeBridge::connect_and_register_() {
   uint32_t start = millis();
   while (millis() - start < 5000) {
     if (client_.available() >= (int)sizeof(SuplaPacketHeader)) {
-
-      ESP_LOGI(TAG, "Incoming data available: %d bytes", client_.available());
 
       SuplaPacketHeader hdr;
       client_.readBytes((uint8_t *)&hdr, sizeof(hdr));
@@ -158,7 +157,7 @@ bool SuplaEsphomeBridge::connect_and_register_() {
 }
 
 // ---------------------------------------------------------
-// Send REGISTER packet
+// SEND REGISTER PACKET
 // ---------------------------------------------------------
 bool SuplaEsphomeBridge::send_register_() {
   SuplaDeviceRegister_B reg{};
@@ -188,7 +187,6 @@ bool SuplaEsphomeBridge::send_register_() {
   reg.channels[1].type = SUPLA_CHANNELTYPE_RELAY;
   reg.channels[1].value_type = SUPLA_VALUE_TYPE_ONOFF;
 
-  ESP_LOGI(TAG, "Sending REGISTER packet...");
   hex_dump("TX REGISTER", (uint8_t *)&reg, sizeof(reg));
 
   send_packet_((uint8_t *)&reg, sizeof(reg));
@@ -198,6 +196,146 @@ bool SuplaEsphomeBridge::send_register_() {
 }
 
 // ---------------------------------------------------------
-// Send packet (with header + payload)
+// SEND PACKET (HEADER + PAYLOAD)
 // ---------------------------------------------------------
-void SuplaEsphomeBridge::send_packet_(const
+void SuplaEsphomeBridge::send_packet_(const uint8_t *payload, uint16_t size) {
+  SuplaPacketHeader hdr;
+  supla_prepare_header(hdr, size, payload);
+
+  ESP_LOGI(TAG, "TX HEADER: size=%u crc=%04X", hdr.data_size, hdr.crc16);
+  hex_dump("TX PAYLOAD", payload, size);
+
+  client_.write((uint8_t *)&hdr, sizeof(hdr));
+  client_.write(payload, size);
+}
+
+// ---------------------------------------------------------
+// SEND TEMPERATURE
+// ---------------------------------------------------------
+void SuplaEsphomeBridge::send_value_temp_() {
+  if (!temp_sensor_ || !registered_ || !client_.connected())
+    return;
+
+  SuplaChannelValueChangedTemp_B v{};
+  v.type = SUPLA_SD_CHANNEL_VALUE_CHANGED_B;
+  v.channel_number = 0;
+  v.value_type = SUPLA_VALUE_TYPE_DOUBLE;
+  v.temperature = (double) temp_sensor_->state;
+
+  send_packet_((uint8_t *)&v, sizeof(v));
+}
+
+// ---------------------------------------------------------
+// SEND RELAY STATE
+// ---------------------------------------------------------
+void SuplaEsphomeBridge::send_value_relay_() {
+  if (!switch_light_ || !registered_ || !client_.connected())
+    return;
+
+  SuplaChannelValueChangedRelay_B v{};
+  v.type = SUPLA_SD_CHANNEL_VALUE_CHANGED_B;
+  v.channel_number = 1;
+  v.value_type = SUPLA_VALUE_TYPE_ONOFF;
+  v.state = switch_light_->current_values.is_on() ? 1 : 0;
+
+  send_packet_((uint8_t *)&v, sizeof(v));
+}
+
+// ---------------------------------------------------------
+// SEND PING
+// ---------------------------------------------------------
+void SuplaEsphomeBridge::send_ping_() {
+  if (!client_.connected())
+    return;
+
+  SuplaPing_B p{};
+  p.type = SUPLA_SD_PING_CLIENT;
+
+  send_packet_((uint8_t *)&p, sizeof(p));
+}
+
+// ---------------------------------------------------------
+// HANDLE INCOMING PACKETS
+// ---------------------------------------------------------
+void SuplaEsphomeBridge::handle_incoming_() {
+  while (client_.available() >= (int)sizeof(SuplaPacketHeader)) {
+
+    SuplaPacketHeader hdr;
+    client_.readBytes((uint8_t *)&hdr, sizeof(hdr));
+
+    ESP_LOGI(TAG, "RX HEADER: size=%u crc=%04X", hdr.data_size, hdr.crc16);
+
+    if (hdr.marker[0] != 'S' || hdr.marker[1] != 'U' || hdr.marker[2] != 'P') {
+      ESP_LOGE(TAG, "Invalid SUPLA header");
+      return;
+    }
+
+    uint16_t size = hdr.data_size;
+    if (size == 0 || size > 256) {
+      ESP_LOGE(TAG, "Invalid packet size: %u", size);
+      return;
+    }
+
+    uint8_t buf[256];
+    client_.readBytes(buf, size);
+
+    hex_dump("RX PAYLOAD", buf, size);
+
+    uint16_t crc = supla_crc16(buf, size);
+    ESP_LOGI(TAG, "CRC CALC=%04X  CRC HDR=%04X", crc, hdr.crc16);
+
+    if (crc != hdr.crc16) {
+      ESP_LOGE(TAG, "CRC mismatch");
+      continue;
+    }
+
+    uint16_t type = *(uint16_t *)buf;
+    ESP_LOGI(TAG, "RX packet type: %u", type);
+
+    if (type == SUPLA_SD_CHANNEL_NEW_VALUE_B) {
+      SuplaChannelNewValueRelay_B *cmd = (SuplaChannelNewValueRelay_B *)buf;
+
+      ESP_LOGI(TAG, "SET VALUE: channel=%u state=%u",
+               cmd->channel_number, cmd->state);
+
+      if (cmd->channel_number == 1 && switch_light_) {
+        if (cmd->state)
+          switch_light_->turn_on().perform();
+        else
+          switch_light_->turn_off().perform();
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------
+// MAIN LOOP
+// ---------------------------------------------------------
+void SuplaEsphomeBridge::loop() {
+  if (!client_.connected()) {
+    registered_ = false;
+    uint32_t now = millis();
+    if (now - last_reconnect_attempt_ > 10000) {
+      last_reconnect_attempt_ = now;
+      connect_and_register_();
+    }
+    return;
+  }
+
+  handle_incoming_();
+
+  uint32_t now = millis();
+  if (now - last_send_ > 10000) {
+    last_send_ = now;
+    send_value_temp_();
+    send_value_relay_();
+  }
+
+  if (now - last_ping_ > 30000) {
+    last_ping_ = now;
+    send_ping_();
+  }
+}
+
+}  // namespace supla_esphome_bridge
+}  // namespace esphome
