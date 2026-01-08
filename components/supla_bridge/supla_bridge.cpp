@@ -24,17 +24,13 @@ void SuplaBridge::update_switch(bool state) {
   // tutaj wysyłasz stan do SUPLA
   // np. SuplaDevice.channelSetValue(...)
 
-  // a jeśli SUPLA ma sterować ESPHome:
+  // Przykład: SUPLA steruje ESPHome
   if (state) {
-    if (on_turn_on_trigger_) {
-      ESP_LOGI(TAG, "Trigger: SUPLA -> ESPHome ON");
-      on_turn_on_trigger_->fire();
-    }
+    ESP_LOGI(TAG, "Trigger: SUPLA -> ESPHome ON");
+    on_turn_on_trigger_.trigger();
   } else {
-    if (on_turn_off_trigger_) {
-      ESP_LOGI(TAG, "Trigger: SUPLA -> ESPHome OFF");
-      on_turn_off_trigger_->fire();
-    }
+    ESP_LOGI(TAG, "Trigger: SUPLA -> ESPHome OFF");
+    on_turn_off_trigger_.trigger();
   }
 }
 
