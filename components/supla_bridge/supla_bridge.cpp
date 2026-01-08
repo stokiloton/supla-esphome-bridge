@@ -1,6 +1,10 @@
 #include "supla_bridge.h"
 #include "esphome/core/log.h"
 
+#include "SuplaDevice.h"
+#include "supla/network/custom_tcp.h"
+#include <WiFiClient.h>
+
 namespace esphome {
 namespace supla_bridge {
 
@@ -11,11 +15,23 @@ void SuplaBridge::setup() {
   ESP_LOGI(TAG, "Server: %s", server_.c_str());
   ESP_LOGI(TAG, "User: %s", email_.c_str());
 
-  // tutaj inicjalizacja SUPLA (np. SuplaDevice.begin)
+  // create WiFiClient and wrap it into Supla CustomTcp
+  // keep them as members to ensure lifetime
+  WiFiClient *wifi_client = new WiFiClient();
+  custom_tcp_ = new Supla::Network::CustomTcp(wifi_client);
+  network_client_ = custom_tcp_;
+
+  // pass network client to SuplaDevice
+  SuplaDevice.setNetworkClient(network_client_);
+
+  // initialize SuplaDevice (GUID and authkey must be set elsewhere or in config)
+  // here we call begin() without GUID/authkey to run default init
+  SuplaDevice.begin(23);
 }
 
 void SuplaBridge::loop() {
-  // tutaj obsługa SUPLA (np. SuplaDevice.iterate)
+  // iterate SuplaDevice
+  SuplaDevice.iterate();
 }
 
 void SuplaBridge::update_switch(bool state) {
