@@ -57,10 +57,9 @@ bool SuplaEsphomeBridge::connect_and_register_() {
     client_.stop();
     return false;
   }
-  // Czekamy na wynik rejestracji
   uint32_t start = millis();
   while (millis() - start < 5000) {
-    if (client_.available() >= (int)(sizeof(SuplaPacketHeader) + sizeof(SuplaDeviceRegisterResult))) {
+    if (client_.available() >= (int)(sizeof(SuplaPacketHeader) + sizeof(SuplaDeviceRegisterResult_B))) {
       SuplaPacketHeader hdr;
       client_.readBytes((uint8_t *)&hdr, sizeof(hdr));
       if (hdr.marker[0] != 'S' || hdr.marker[1] != 'U' || hdr.marker[2] != 'P') {
@@ -68,32 +67,29 @@ bool SuplaEsphomeBridge::connect_and_register_() {
         break;
       }
       uint16_t size = hdr.data_size;
-      if (size < sizeof(SuplaDeviceRegisterResult)) {
-        ESP_LOGW(TAG, "Invalid register result size");
+      if (size < sizeof(SuplaDeviceRegisterResult_B) || size > 64) {
+        ESP_LOGW(TAG, "Invalid register result size: %u", size);
         break;
       }
       uint8_t buf[64];
-      if (size > sizeof(buf)) {
-        ESP_LOGW(TAG, "Register result too big");
-        break;
-      }
       client_.readBytes(buf, size);
       uint16_t crc = supla_crc16(buf, size);
       if (crc != hdr.crc16) {
         ESP_LOGW(TAG, "CRC mismatch in register result");
         break;
       }
-      SuplaDeviceRegisterResult *res = (SuplaDeviceRegisterResult *)buf;
-      if (res->type != SUPLA_SD_DEVICE_REGISTER_RESULT) {
+      SuplaDeviceRegisterResult_B *res = (SuplaDeviceRegisterResult_B *)buf;
+      if (res->type != SUPLA_SD_DEVICE_REGISTER_RESULT_B) {
         ESP_LOGW(TAG, "Unexpected packet type: %u", res->type);
         break;
       }
-      if (res->result == 0) {
-        ESP_LOGI(TAG, "SUPLA registration OK, device_id=%u", res->device_id);
+      if (res->result_code == 0) {
+        ESP_LOGI(TAG, "SUPLA registration OK, device_id=%u, channels=%u",
+                 res->device_id, res->channel_count);
         registered_ = true;
         return true;
       } else {
-        ESP_LOGE(TAG, "SUPLA registration failed, result=%u", res->result);
+        ESP_LOGE(TAG, "SUPLA registration failed, result=%u", res->result_code);
         break;
       }
     }
@@ -105,19 +101,25 @@ bool SuplaEsphomeBridge::connect_and_register_() {
 }
 
 bool SuplaEsphomeBridge::send_register_() {
-  SuplaDeviceRegister reg{};
-  reg.type = SUPLA_SD_DEVICE_REGISTER;
-  reg.proto_version = 1;
+  SuplaDeviceRegister_B reg{};
+  reg.type = SUPLA_SD_DEVICE_REGISTER_B;
+  reg.proto_version = 17;
+  memset(reg.software_version, 0, sizeof(reg.software_version));
+  strncpy(reg.software_version, "1.0", sizeof(reg.software_version) - 1);
   reg.guid = guid_;
   reg.location_id = location_id_;
   memcpy(reg.location_password, location_password_, sizeof(location_password_));
+  reg.manufacturer_id = 0;
+  reg.product_id = 0;
   memset(reg.device_name, 0, sizeof(reg.device_name));
   strncpy(reg.device_name, device_name_.c_str(), sizeof(reg.device_name) - 1);
   reg.channel_count = 2;
   reg.channels[0].channel_number = 0;
   reg.channels[0].type = SUPLA_CHANNELTYPE_SENSOR_TEMP;
+  reg.channels[0].value_type = SUPLA_VALUE_TYPE_DOUBLE;
   reg.channels[1].channel_number = 1;
   reg.channels[1].type = SUPLA_CHANNELTYPE_RELAY;
+  reg.channels[1].value_type = SUPLA_VALUE_TYPE_ONOFF;
 
   send_packet_((uint8_t *)&reg, sizeof(reg));
   ESP_LOGI(TAG, "SUPLA registration sent");
@@ -134,22 +136,22 @@ void SuplaEsphomeBridge::send_packet_(const uint8_t *payload, uint16_t size) {
 void SuplaEsphomeBridge::send_value_temp_() {
   if (!temp_sensor_ || !registered_ || !client_.connected())
     return;
-  SuplaValueChangedTemp v{};
-  v.type = SUPLA_SD_VALUE_CHANGED;
+  SuplaChannelValueChangedTemp_B v{};
+  v.type = SUPLA_SD_CHANNEL_VALUE_CHANGED_B;
   v.channel_number = 0;
-  v.value_type = 1;  // temp
-  v.temperature = temp_sensor_->state;
+  v.value_type = SUPLA_VALUE_TYPE_DOUBLE;
+  v.temperature = (double) temp_sensor_->state;
   send_packet_((uint8_t *)&v, sizeof(v));
-  ESP_LOGD(TAG, "Sent temperature: %.2f", v.temperature);
+  ESP_LOGD(TAG, "Sent temperature: %.2f", (float) v.temperature);
 }
 
 void SuplaEsphomeBridge::send_value_relay_() {
   if (!switch_light_ || !registered_ || !client_.connected())
     return;
-  SuplaValueChangedRelay v{};
-  v.type = SUPLA_SD_VALUE_CHANGED;
+  SuplaChannelValueChangedRelay_B v{};
+  v.type = SUPLA_SD_CHANNEL_VALUE_CHANGED_B;
   v.channel_number = 1;
-  v.value_type = 2;  // relay
+  v.value_type = SUPLA_VALUE_TYPE_ONOFF;
   v.state = switch_light_->current_values.is_on() ? 1 : 0;
   send_packet_((uint8_t *)&v, sizeof(v));
   ESP_LOGD(TAG, "Sent relay state: %d", v.state);
@@ -158,7 +160,7 @@ void SuplaEsphomeBridge::send_value_relay_() {
 void SuplaEsphomeBridge::send_ping_() {
   if (!client_.connected())
     return;
-  SuplaPing p{};
+  SuplaPing_B p{};
   p.type = SUPLA_SD_PING_CLIENT;
   send_packet_((uint8_t *)&p, sizeof(p));
   ESP_LOGD(TAG, "Sent PING");
@@ -175,7 +177,6 @@ void SuplaEsphomeBridge::handle_incoming_() {
     uint16_t size = hdr.data_size;
     if (size == 0 || size > 128) {
       ESP_LOGW(TAG, "Invalid packet size: %u", size);
-      // odczytaj i wyrzuć
       uint8_t dump[128];
       int to_read = std::min((int)size, (int)sizeof(dump));
       client_.readBytes(dump, to_read);
@@ -190,10 +191,11 @@ void SuplaEsphomeBridge::handle_incoming_() {
     }
 
     uint16_t type = *(uint16_t *)buf;
-    if (type == SUPLA_SD_SET_VALUE) {
-      if (size >= sizeof(SuplaSetValueRelay)) {
-        SuplaSetValueRelay *cmd = (SuplaSetValueRelay *)buf;
-        if (cmd->value_type == 2 && cmd->channel_number == 1 && switch_light_) {
+    if (type == SUPLA_SD_CHANNEL_NEW_VALUE_B) {
+      if (size >= sizeof(SuplaChannelNewValueRelay_B)) {
+        SuplaChannelNewValueRelay_B *cmd = (SuplaChannelNewValueRelay_B *)buf;
+        if (cmd->value_type == SUPLA_VALUE_TYPE_ONOFF &&
+            cmd->channel_number == 1 && switch_light_) {
           if (cmd->state) {
             switch_light_->turn_on().perform();
           } else {
@@ -204,7 +206,6 @@ void SuplaEsphomeBridge::handle_incoming_() {
       }
     } else if (type == SUPLA_SD_PING_SERVER) {
       ESP_LOGD(TAG, "Received PING from server");
-      // Można odpowiedzieć PING_CLIENT, ale mamy heartbeat
     } else {
       ESP_LOGD(TAG, "Received packet type: %u", type);
     }
