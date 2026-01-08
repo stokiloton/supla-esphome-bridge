@@ -4,6 +4,7 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/light/light_state.h"
 #include <WiFiClient.h>
+#include "supla_suml.h"
 #include "supla_protocol_minimal.h"
 
 namespace esphome {
@@ -32,6 +33,7 @@ class SuplaEsphomeBridge : public Component {
   WiFiClient client_;
   bool registered_{false};
   uint32_t last_send_{0};
+  uint32_t last_ping_{0};
   uint32_t last_reconnect_attempt_{0};
 
   sensor::Sensor *temp_sensor_{nullptr};
@@ -39,10 +41,12 @@ class SuplaEsphomeBridge : public Component {
 
   void generate_guid_();
   bool connect_and_register_();
-  void send_registration_();
-  void send_temperature_();
-  void send_relay_state_();
+  bool send_register_();
+  void send_value_temp_();
+  void send_value_relay_();
+  void send_ping_();
   void handle_incoming_();
+  void send_packet_(const uint8_t *payload, uint16_t size);
 };
 
 }  // namespace supla_esphome_bridge
