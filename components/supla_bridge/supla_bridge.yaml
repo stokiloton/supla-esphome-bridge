@@ -1,0 +1,6 @@
+# Example YAML for importing this component
+supla_bridge:
+  server: "svrX.supla.org"
+  user: "email@example.com"
+  password: "haslo"
+  switch_id: example_switch
