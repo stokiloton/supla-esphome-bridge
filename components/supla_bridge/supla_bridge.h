@@ -8,25 +8,17 @@
 namespace esphome {
 namespace supla_bridge {
 
-class SuplaTurnOnTrigger : public Trigger<> {
- public:
-  void fire() { this->trigger(); }
-};
-
-class SuplaTurnOffTrigger : public Trigger<> {
- public:
-  void fire() { this->trigger(); }
-};
-
 class SuplaBridge : public Component {
  public:
   void set_server(const std::string &server) { server_ = server; }
   void set_email(const std::string &email) { email_ = email; }
   void set_password(const std::string &password) { password_ = password; }
 
-  void set_on_turn_on_trigger(SuplaTurnOnTrigger *trig) { on_turn_on_trigger_ = trig; }
-  void set_on_turn_off_trigger(SuplaTurnOffTrigger *trig) { on_turn_off_trigger_ = trig; }
+  // Zwracamy triggery jako Trigger<>
+  Trigger<> *get_turn_on_trigger() { return &on_turn_on_trigger_; }
+  Trigger<> *get_turn_off_trigger() { return &on_turn_off_trigger_; }
 
+  // Wywoływane z ESPHome (lambda w YAML) do wysłania stanu do SUPLA
   void update_switch(bool state);
 
   void setup() override;
@@ -37,8 +29,9 @@ class SuplaBridge : public Component {
   std::string email_;
   std::string password_;
 
-  SuplaTurnOnTrigger *on_turn_on_trigger_{nullptr};
-  SuplaTurnOffTrigger *on_turn_off_trigger_{nullptr};
+  // Triggery SUPLA -> ESPHome
+  Trigger<> on_turn_on_trigger_;
+  Trigger<> on_turn_off_trigger_;
 
   // tutaj możesz dodać obiekt SUPLA (np. SuplaDevice)
 };
