@@ -40,18 +40,21 @@ async def to_code(config):
     cg.add(var.set_password(config[CONF_PASSWORD]))
 
     # Triggery: SUPLA -> ESPHome
-    if CONF_ON_SUPLA_TURN_ON in config:
+
+    # on_supla_turn_on: lista automatyzacji → iterujemy
+    for conf in config.get(CONF_ON_SUPLA_TURN_ON, []):
         trig = var.get_turn_on_trigger()
         await automation.build_automation(
             trig,
             [],
-            config[CONF_ON_SUPLA_TURN_ON],
+            conf,
         )
 
-    if CONF_ON_SUPLA_TURN_OFF in config:
+    # on_supla_turn_off: lista automatyzacji → iterujemy
+    for conf in config.get(CONF_ON_SUPLA_TURN_OFF, []):
         trig = var.get_turn_off_trigger()
         await automation.build_automation(
             trig,
             [],
-            config[CONF_ON_SUPLA_TURN_OFF],
+            conf,
         )
