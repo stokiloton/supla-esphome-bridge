@@ -1,0 +1,80 @@
+esphome:
+  name: termometr1
+  friendly_name: termometr1
+
+esp8266:
+  board: esp01_1m
+
+logger:
+api:
+
+ota:
+  - platform: esphome
+    password: "xxx"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  ap:
+    ssid: "termometr1"
+    password: "xxx"
+
+captive_portal:
+improv_serial:
+
+web_server:
+  port: 80
+  version: 3
+  log: true
+  local: true
+
+external_components:
+  - source: github://twoj-user/supla-esphome-bridge
+    components: [supla_esphome_bridge]
+
+one_wire:
+  - platform: gpio
+    pin: GPIO3
+
+sensor:
+  - platform: dallas_temp
+    address: 0xee07ced4463b2128
+    name: "Temperatura w domu"
+    accuracy_decimals: 1
+    update_interval: 10s
+    id: termometr1_temp
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO0
+      mode: INPUT_PULLUP
+      inverted: True
+    name: "termometr1 Button"
+    on_release:
+      - light.toggle: termometr1_switch
+
+light:
+  - platform: binary
+    output: relay
+    name: "termometr1 Switch"
+    id: termometr1_switch
+
+output:
+  - platform: gpio
+    pin: GPIO12
+    id: relay
+
+status_led:
+  pin:
+    number: GPIO13
+    inverted: yes
+
+supla_esphome_bridge:
+  server: "svr1.supla.org"
+  location_id: 12345
+  location_password: "00112233445566778899AABBCCDDEEFF"
+  device_name: "esphome"
+  temperature: termometr1_temp
+  switch: termometr1_switch
