@@ -5,15 +5,8 @@
 #include "esphome/core/helpers.h"
 #include "esphome/core/automation.h"
 
-// forward declarations for Supla network types
-namespace Supla {
-class Client;
-namespace Network {
-class CustomTcp;
-}  // namespace Network
-}  // namespace Supla
-
-// forward declare WiFiClient
+// forward declare WiFiClient (do not declare Supla namespaces here to avoid
+// conflicts with Supla headers included by the SuplaDevice library)
 class WiFiClient;
 
 namespace esphome {
@@ -44,13 +37,7 @@ class SuplaBridge : public Component {
   Trigger<> on_turn_on_trigger_;
   Trigger<> on_turn_off_trigger_;
 
-  // tutaj możesz dodać obiekt SUPLA (np. SuplaDevice)
-
-  // network client wrapper passed to SuplaDevice
-  Supla::Client *network_client_ = nullptr;
-  Supla::Network::CustomTcp *custom_tcp_ = nullptr;
-  // keep WiFiClient to ensure its lifetime
-  WiFiClient *wifi_client_ = nullptr;
+  // Do not store Supla types in this header to avoid ABI/compile conflicts
 };
 
 }  // namespace supla_bridge
