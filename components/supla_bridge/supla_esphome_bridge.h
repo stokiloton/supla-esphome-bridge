@@ -5,7 +5,7 @@
 #include "esphome/components/light/light_state.h"
 #include <WiFiClient.h>
 #include "supla_suml.h"
-#include "supla_protocol_minimal.h"
+#include "supla_proto_structs.h"
 
 namespace esphome {
 namespace supla_esphome_bridge {
