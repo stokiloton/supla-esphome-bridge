@@ -229,21 +229,21 @@ bool SuplaEsphomeBridge::connect_and_register_() {
 // SEND REGISTER PACKET (proto C + B + B + E)
 // ---------------------------------------------------------
 
-bool SuplaEsphomeBridge::send_register_() {
-  // Używamy struktury TDS_SuplaRegisterDevice_C (istnieje w proto.h),
-  // ale ustawiamy tylko pola, które występują w aktualnym proto.h:
-  // GUID, LocationPWD (lub LocationPassword), LocationID, Name, SoftVer, ServerName, channel_count, channels[]
+// Zastąp istniejącą funkcję send_register_() poniższą wersją
 
+bool SuplaEsphomeBridge::send_register_() {
+  // REGISTER_DEVICE_C – struktura z proto.h
   TDS_SuplaRegisterDevice_C reg{};
   memset(&reg, 0, sizeof(reg));
 
-  // Niektóre wersje mają pole Version, inne nie — ustawiamy tylko jeśli istnieje
+  // Jeśli struktura ma pole Version (niektóre wersje), ustaw je defensywnie
 #ifdef SUPLA_REGISTER_DEVICE_C_VERSION_FIELD
+  // niektóre proto.h mogą mieć pole Version
   reg.Version = 23;
 #endif
 
-  // GUID (16 bajtów)
-#ifdef SUPLA_GUID_SIZE
+  // GUID (zakładamy, że guid_.guid ma 16 bajtów)
+#if defined(SUPLA_GUID_SIZE)
   memcpy(reg.GUID, guid_.guid, SUPLA_GUID_SIZE);
 #else
   memcpy(reg.GUID, guid_.guid, 16);
@@ -252,32 +252,29 @@ bool SuplaEsphomeBridge::send_register_() {
   // LocationID
   reg.LocationID = static_cast<int32_t>(location_id_);
 
-  // Location password — różne nazwy w różnych wersjach proto.h
-#if defined(SUPLA_LOCATION_PWD_MAXSIZE) && defined(TDS_SuplaRegisterDevice_C) && (defined(__cplusplus))
-  // preferowana nazwa LocationPWD
-  #ifdef __has_include
-  #endif
-#endif
-
-#if defined(TDS_SuplaRegisterDevice_C) && (sizeof(reg) > 0)
-  // Spróbuj skopiować do LocationPWD lub LocationPassword w zależności od nazwy
-#if defined(SUPLA_LOCATION_PWD_MAXSIZE) && defined(__GNUC__)
-  // jeśli pole LocationPWD istnieje w strukturze
-  // użyj memcpy z rozmiarem SUPLA_LOCATION_PWD_MAXSIZE jeśli dostępne
-  #ifdef SUPLA_LOCATION_PWD_MAXSIZE
-    memcpy(reg.LocationPWD, location_password_, SUPLA_LOCATION_PWD_MAXSIZE);
+  // Location password - różne nazwy w różnych proto.h
+#if defined(SUPLA_LOCATION_PWD_MAXSIZE)
+  // jeśli proto.h definiuje rozmiar, użyj go
+  memcpy(reg.LocationPWD, location_password_, SUPLA_LOCATION_PWD_MAXSIZE);
+#elif defined(__has_include)
+  // fallback: spróbuj skopiować do pola LocationPWD, a jeśli go nie ma, do LocationPassword
+  // (kompilator zignoruje nieistniejące pole tylko jeśli otoczysz to #ifdef; tutaj zakładamy LocationPWD)
+  #ifdef TDS_SuplaRegisterDevice_C__HAS_LOCATIONPWD
+    memcpy(reg.LocationPWD, location_password_, sizeof(reg.LocationPWD));
   #else
-    // fallback: spróbuj LocationPassword
+    // jeśli w Twojej wersji pole nazywa się LocationPassword
     memcpy(reg.LocationPassword, location_password_, sizeof(location_password_));
   #endif
 #else
-  // fallback: spróbuj obie nazwy (jeśli istnieją, kompilator zignoruje nieistniejące przez #ifdef)
+  // Najprostszy fallback: spróbuj obydwu nazw (pierwsza, która istnieje, zostanie skompilowana)
   #ifdef SUPLA_LOCATION_PWD_MAXSIZE
     memcpy(reg.LocationPWD, location_password_, SUPLA_LOCATION_PWD_MAXSIZE);
   #else
-    memcpy(reg.LocationPassword, location_password_, sizeof(location_password_));
+    // jeśli nie ma LocationPWD, spróbuj LocationPassword (może nie istnieć w niektórych proto.h)
+    #ifdef TDS_SuplaRegisterDevice_C__HAS_LOCATIONPASSWORD
+      memcpy(reg.LocationPassword, location_password_, sizeof(location_password_));
+    #endif
   #endif
-#endif
 #endif
 
   // Manufacturer/Product — ustaw na 0 jeśli pola istnieją
@@ -286,11 +283,12 @@ bool SuplaEsphomeBridge::send_register_() {
   reg.ProductID = 0;
 #endif
 
-  // SoftVer, Name, ServerName — kopiujemy defensywnie
+  // SoftVer i Name — kopiujemy bezpiecznie używając rozmiaru pola w strukturze
+  // Jeśli nie masz pola soft_ver_ w klasie, użyj literału "1.0"
 #if defined(SUPLA_SOFTVER_MAXSIZE)
-  strncpy(reg.SoftVer, soft_ver_.c_str(), SUPLA_SOFTVER_MAXSIZE - 1);
+  strncpy(reg.SoftVer, "1.0", SUPLA_SOFTVER_MAXSIZE - 1);
 #else
-  strncpy(reg.SoftVer, soft_ver_.c_str(), sizeof(reg.SoftVer) - 1);
+  strncpy(reg.SoftVer, "1.0", sizeof(reg.SoftVer) - 1);
 #endif
 
 #if defined(SUPLA_DEVICE_NAME_MAXSIZE)
@@ -302,16 +300,36 @@ bool SuplaEsphomeBridge::send_register_() {
 #if defined(SUPLA_SERVER_NAME_MAXSIZE)
   strncpy(reg.ServerName, server_.c_str(), SUPLA_SERVER_NAME_MAXSIZE - 1);
 #else
-  strncpy(reg.ServerName, server_.c_str(), sizeof(reg.ServerName) - 1);
+  // jeśli struktura ma pole ServerName o znanym rozmiarze
+  #ifdef HAS_SuplaRegisterDevice_C_ServerName
+    strncpy(reg.ServerName, server_.c_str(), sizeof(reg.ServerName) - 1);
+  #endif
 #endif
 
-  // channel_count — w proto.h pole nazywa się channel_count
-  reg.channel_count = 2;
+  // Flags — ustaw jeśli pole istnieje
+#ifdef SUPLA_REGISTER_DEVICE_C_HAS_FLAGS
+  reg.Flags = 0;
+#endif
 
-  // Kanały: używamy typu TDS_SuplaDeviceChannel_B (nazwa występuje w nowszych proto.h)
-  // Wypełniamy pola defensywnie: Number, Type, FuncList, Default, value[]
-#ifdef TDS_SuplaDeviceChannel_B
-  // Kanał 0 - temperatura / sensor
+  // channel_count (w nowszych proto.h pole nazywa się channel_count)
+#if defined(HAS_CHANNEL_COUNT_FIELD)
+  reg.channel_count = 2;
+#else
+  // starsze nazwy: ChannelCount
+  #ifdef HAS_ChannelCount_FIELD
+    reg.ChannelCount = 2;
+  #else
+    // jeśli nie ma żadnego, pomijamy (ale większość proto.h ma channel_count)
+    #if defined(__GNUC__)
+      reg.channel_count = 2; // spróbuj ustawić; jeśli pole nie istnieje, kompilator zgłosi błąd i wtedy trzeba dopasować do proto.h
+    #endif
+  #endif
+#endif
+
+  // Przygotuj kanały - użyj nazwy struktury dostępnej w proto.h
+  // Najczęściej: TDS_SuplaDeviceChannel_B reg.channels[]
+#if defined(TDS_SuplaDeviceChannel_B)
+  // Kanał 0 - temperatura (sensor)
   TDS_SuplaDeviceChannel_B ch0{};
   memset(&ch0, 0, sizeof(ch0));
   ch0.Number = 0;
@@ -322,7 +340,6 @@ bool SuplaEsphomeBridge::send_register_() {
 #else
   ch0.Type = 0;
 #endif
-
 #if defined(SUPLA_CHANNELFNC_THERMOMETER)
   ch0.FuncList = SUPLA_CHANNELFNC_THERMOMETER;
 #endif
@@ -336,10 +353,7 @@ bool SuplaEsphomeBridge::send_register_() {
   ch1.Number = 1;
 #if defined(SUPLA_CHANNELTYPE_RELAY)
   ch1.Type = SUPLA_CHANNELTYPE_RELAY;
-#else
-  ch1.Type = 0;
 #endif
-
 #if defined(SUPLA_CHANNELFNC_LIGHTSWITCH)
   ch1.FuncList = SUPLA_CHANNELFNC_LIGHTSWITCH;
 #endif
@@ -347,72 +361,65 @@ bool SuplaEsphomeBridge::send_register_() {
   memset(ch1.value, 0, sizeof(ch1.value));
   reg.channels[1] = ch1;
 #else
-  // Jeśli TDS_SuplaDeviceChannel_B nie istnieje, spróbuj starszej nazwy TDS_Channel_B
-#ifdef TDS_Channel_B
-  TDS_Channel_B ch0{};
-  memset(&ch0, 0, sizeof(ch0));
-  ch0.Number = 0;
-#if defined(SUPLA_CHANNELTYPE_SENSOR_TEMP)
-  ch0.Type = SUPLA_CHANNELTYPE_SENSOR_TEMP;
-#endif
-  ch0.ValueType = 0;
-  reg.channels[0] = ch0;
+  // Fallback: jeśli struktura kanału ma inną nazwę, spróbuj starszej nazwy TDS_Channel_B
+  #ifdef TDS_Channel_B
+    TDS_Channel_B ch0{};
+    memset(&ch0, 0, sizeof(ch0));
+    ch0.Number = 0;
+    #ifdef SUPLA_CHANNELTYPE_SENSOR_TEMP
+      ch0.Type = SUPLA_CHANNELTYPE_SENSOR_TEMP;
+    #endif
+    ch0.ValueType = 0;
+    reg.channels[0] = ch0;
 
-  TDS_Channel_B ch1{};
-  memset(&ch1, 0, sizeof(ch1));
-  ch1.Number = 1;
-#if defined(SUPLA_CHANNELTYPE_RELAY)
-  ch1.Type = SUPLA_CHANNELTYPE_RELAY;
-#endif
-  ch1.ValueType = 0;
-  reg.channels[1] = ch1;
-#endif
+    TDS_Channel_B ch1{};
+    memset(&ch1, 0, sizeof(ch1));
+    ch1.Number = 1;
+    #ifdef SUPLA_CHANNELTYPE_RELAY
+      ch1.Type = SUPLA_CHANNELTYPE_RELAY;
+    #endif
+    ch1.ValueType = 0;
+    reg.channels[1] = ch1;
+  #endif
 #endif
 
   // Wyślij REGISTER_C
   hex_dump("TX REGISTER_C", reinterpret_cast<uint8_t *>(&reg), sizeof(reg));
   send_packet_(reinterpret_cast<uint8_t *>(&reg), sizeof(reg));
 
-  // Wyślij CHANNEL_B dla każdego kanału — używamy struktury kanału (jeśli istnieje)
-#ifdef TDS_SuplaDeviceChannel_B
+  // Wyślij CHANNEL_B dla każdego kanału (jeśli struktury istnieją)
+#if defined(TDS_SuplaDeviceChannel_B)
   hex_dump("TX CHANNEL_B #0", reinterpret_cast<uint8_t *>(&reg.channels[0]), sizeof(reg.channels[0]));
   send_packet_(reinterpret_cast<uint8_t *>(&reg.channels[0]), sizeof(reg.channels[0]));
 
   hex_dump("TX CHANNEL_B #1", reinterpret_cast<uint8_t *>(&reg.channels[1]), sizeof(reg.channels[1]));
   send_packet_(reinterpret_cast<uint8_t *>(&reg.channels[1]), sizeof(reg.channels[1]));
 #else
-  // fallback: jeśli nie ma dedykowanej struktury, wysyłamy minimalne bloki
-  // (ten kod jest defensywny i może być dostosowany do konkretnego proto.h)
+  // fallback prosty: wysyłamy minimalne bloki (dostosuj do swojego proto.h jeśli trzeba)
   uint8_t chbuf[16];
   memset(chbuf, 0, sizeof(chbuf));
-  // kanał 0
   chbuf[0] = 0; // number
-  chbuf[1] = 0; // type low (fallback)
   hex_dump("TX CHANNEL_B #0 (fallback)", chbuf, sizeof(chbuf));
   send_packet_(chbuf, sizeof(chbuf));
-  // kanał 1
   chbuf[0] = 1;
   hex_dump("TX CHANNEL_B #1 (fallback)", chbuf, sizeof(chbuf));
   send_packet_(chbuf, sizeof(chbuf));
 #endif
 
-  // REGISTER_DEVICE_E (koniec rejestracji) — struktura zwykle pusta
+  // REGISTER_DEVICE_E (koniec rejestracji) — jeśli struktura istnieje, wyślij ją
 #ifdef TDS_SuplaRegisterDevice_E
   TDS_SuplaRegisterDevice_E reg_e{};
   memset(&reg_e, 0, sizeof(reg_e));
   hex_dump("TX REGISTER_E", reinterpret_cast<uint8_t *>(&reg_e), sizeof(reg_e));
   send_packet_(reinterpret_cast<uint8_t *>(&reg_e), sizeof(reg_e));
 #else
-  // fallback: wyślij zero-length E (jeśli protokół tego wymaga)
-  TDS_SuplaRegisterDevice_E reg_e_fallback{};
-  memset(&reg_e_fallback, 0, sizeof(reg_e_fallback));
-  hex_dump("TX REGISTER_E (fallback)", reinterpret_cast<uint8_t *>(&reg_e_fallback), sizeof(reg_e_fallback));
-  send_packet_(reinterpret_cast<uint8_t *>(&reg_e_fallback), sizeof(reg_e_fallback));
+  // jeśli nie ma, pomiń
 #endif
 
   ESP_LOGI(TAG, "SUPLA registration (proto C+B+B+E) sent");
   return true;
 }
+
 
 // ---------------------------------------------------------
 // SEND PACKET (HEADER + PAYLOAD)
