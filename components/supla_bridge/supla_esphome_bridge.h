@@ -4,13 +4,38 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/light/light_state.h"
 
-#include <WiFiClient.h>
+#if defined(ESP8266)
+  #include <ESP8266WiFi.h>
+  #include <WiFiClientSecureBearSSL.h>
+  using SecureClient = BearSSL::WiFiClientSecure;
+#elif defined(ESP32)
+  #include <WiFi.h>
+  #include <WiFiClientSecure.h>
+  using SecureClient = WiFiClientSecure;
+#else
+  #include <WiFiClientSecure.h>
+  using SecureClient = WiFiClientSecure;
+#endif
+
 #include <string>
 #include <cstdint>
 #include <cstring>
 
 #include "supla_suml.h"
 #include "proto.h"
+
+// --- Konfiguracja SSL ---
+// Jeśli chcesz akceptować dowolny certyfikat (insecure), odkomentuj poniższą linię.
+// Uwaga: to wyłącza weryfikację TLS i jest niezalecane w produkcji.
+// #define USE_SSL_INSECURE
+
+// Jeśli chcesz weryfikować serwer przez root CA, wklej PEM poniżej (zachowaj format PEM).
+// Przykład:
+// static const char SUPLA_ROOT_CA_PEM[] PROGMEM = "-----BEGIN CERTIFICATE-----\nMIID...==\n-----END CERTIFICATE-----\n";
+#ifndef SUPLA_ROOT_CA_PEM
+  // domyślnie pusty; możesz wkleić tu certyfikat CA
+  #define SUPLA_ROOT_CA_PEM nullptr
+#endif
 
 namespace esphome {
 namespace supla_esphome_bridge {
@@ -42,7 +67,8 @@ class SuplaEsphomeBridge : public Component {
 
   SuplaGuid guid_{};
 
-  WiFiClient client_;
+  // Używamy klienta TLS
+  SecureClient client_;
   bool registered_{false};
 
   sensor::Sensor *temp_sensor_{nullptr};
@@ -86,6 +112,9 @@ class SuplaEsphomeBridge : public Component {
   // Pomocnicze metody
   void start_connect_();
   void process_payload_(uint16_t type, const uint8_t *buf, uint16_t size);
+
+  // SSL init helper
+  void init_tls_client_();
 };
 }  // namespace supla_esphome_bridge
 }  // namespace esphome
