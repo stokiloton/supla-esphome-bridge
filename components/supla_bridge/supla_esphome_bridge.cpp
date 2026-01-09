@@ -1,3 +1,4 @@
+// supla_esphome_bridge.cpp
 #include "supla_esphome_bridge.h"
 #include "esphome/core/log.h"
 
@@ -179,16 +180,21 @@ bool SuplaEsphomeBridge::send_register_() {
   TDS_SuplaRegisterDevice_C reg{};
   memset(&reg, 0, sizeof(reg));
 
+  // wersja protokołu C (23) — zgodnie z implementacją w oryginalnym kodzie
   reg.Version = 23;
 
+  // GUID wygenerowany wcześniej
   memcpy(reg.GUID, guid_.guid, SUPLA_GUID_SIZE);
 
+  // LocationID i LocationPassword ustawiane z istniejącej konfiguracji
   reg.LocationID = static_cast<int32_t>(location_id_);
   memcpy(reg.LocationPassword, location_password_, sizeof(reg.LocationPassword));
 
+  // Manufacturer/Product — ustawione na 0 jeśli brak danych
   reg.ManufacturerID = 0;
   reg.ProductID = 0;
 
+  // SoftVer i Name — przekazywane z istniejącej konfiguracji
   strncpy(reg.SoftVer, "1.0", sizeof(reg.SoftVer) - 1);
   strncpy(reg.Name, device_name_.c_str(), sizeof(reg.Name) - 1);
 
@@ -198,8 +204,9 @@ bool SuplaEsphomeBridge::send_register_() {
   hex_dump("TX REGISTER_C", reinterpret_cast<uint8_t *>(&reg), sizeof(reg));
   send_packet_(reinterpret_cast<uint8_t *>(&reg), sizeof(reg));
 
-  // CHANNEL 0
+  // CHANNEL 0 - temperatura (sensor)
   TDS_Channel_B ch0{};
+  memset(&ch0, 0, sizeof(ch0));
   ch0.Number = 0;
   ch0.Type = SUPLA_CHANNELTYPE_SENSOR_TEMP;
   ch0.ValueType = SUPLA_VALUE_TYPE_DOUBLE;
@@ -207,8 +214,9 @@ bool SuplaEsphomeBridge::send_register_() {
   hex_dump("TX CHANNEL_B #0", reinterpret_cast<uint8_t *>(&ch0), sizeof(ch0));
   send_packet_(reinterpret_cast<uint8_t *>(&ch0), sizeof(ch0));
 
-  // CHANNEL 1
+  // CHANNEL 1 - relay
   TDS_Channel_B ch1{};
+  memset(&ch1, 0, sizeof(ch1));
   ch1.Number = 1;
   ch1.Type = SUPLA_CHANNELTYPE_RELAY;
   ch1.ValueType = SUPLA_VALUE_TYPE_ONOFF;
@@ -216,8 +224,9 @@ bool SuplaEsphomeBridge::send_register_() {
   hex_dump("TX CHANNEL_B #1", reinterpret_cast<uint8_t *>(&ch1), sizeof(ch1));
   send_packet_(reinterpret_cast<uint8_t *>(&ch1), sizeof(ch1));
 
-  // REGISTER_DEVICE_E
+  // REGISTER_DEVICE_E (koniec rejestracji)
   TDS_SuplaRegisterDevice_E reg_e{};
+  memset(&reg_e, 0, sizeof(reg_e));
   hex_dump("TX REGISTER_E", reinterpret_cast<uint8_t *>(&reg_e), sizeof(reg_e));
   send_packet_(reinterpret_cast<uint8_t *>(&reg_e), sizeof(reg_e));
 
@@ -246,6 +255,7 @@ void SuplaEsphomeBridge::send_value_temp_() {
     return;
 
   SuplaChannelValueChangedTemp_B v{};
+  memset(&v, 0, sizeof(v));
   v.type = SUPLA_SD_CHANNEL_VALUE_CHANGED_B;
   v.channel_number = 0;
   v.value_type = SUPLA_VALUE_TYPE_DOUBLE;
@@ -263,6 +273,7 @@ void SuplaEsphomeBridge::send_value_relay_() {
     return;
 
   SuplaChannelValueChangedRelay_B v{};
+  memset(&v, 0, sizeof(v));
   v.type = SUPLA_SD_CHANNEL_VALUE_CHANGED_B;
   v.channel_number = 1;
   v.value_type = SUPLA_VALUE_TYPE_ONOFF;
@@ -280,6 +291,7 @@ void SuplaEsphomeBridge::send_ping_() {
     return;
 
   SuplaPing_B p{};
+  memset(&p, 0, sizeof(p));
   p.type = SUPLA_SD_PING_CLIENT;
 
   send_packet_((uint8_t *) &p, sizeof(p));
