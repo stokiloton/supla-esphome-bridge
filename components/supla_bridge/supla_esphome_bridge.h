@@ -7,8 +7,7 @@
 #include <WiFiClient.h>
 
 #include "supla_suml.h"
-#include "supla_proto_structs.h"
-#include "proto.h"   // ← plik w tym samym katalogu
+#include "proto.h"
 
 namespace esphome {
 namespace supla_esphome_bridge {
