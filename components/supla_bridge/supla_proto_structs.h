@@ -43,7 +43,7 @@ typedef struct {
 } SuplaChannelValueChangedRelay_B;
 
 // ------------------------------------------------------------
-// Struktura NEW_VALUE – Twoja własna
+// Struktura NEW_VALUE – Twoje własne
 // ------------------------------------------------------------
 
 typedef struct {
@@ -54,7 +54,7 @@ typedef struct {
 } SuplaChannelNewValueRelay_B;
 
 // ------------------------------------------------------------
-// Struktura REGISTER_RESULT – Twoja własna
+// Struktura REGISTER_RESULT – Twoje własne
 // ------------------------------------------------------------
 
 typedef struct {
@@ -65,7 +65,7 @@ typedef struct {
 } SuplaDeviceRegisterResult_B;
 
 // ------------------------------------------------------------
-// Struktura PING – Twoja własna
+// Struktura PING – Twoje własne
 // ------------------------------------------------------------
 
 typedef struct {
