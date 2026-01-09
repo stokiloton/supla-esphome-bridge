@@ -146,7 +146,7 @@ bool SuplaEsphomeBridge::connect_and_register_() {
       ESP_LOGI(TAG, "Packet type: %u", type);
 
       if (type == SUPLA_SD_DEVICE_REGISTER_RESULT_B) {
-        auto *res = (TDS_SuplaDeviceRegisterResult_B *) buf;
+        auto *res = (SuplaDeviceRegisterResult_B *) buf;
         ESP_LOGI(TAG, "REGISTER RESULT: result=%u device_id=%u channels=%u",
                  res->result_code, res->device_id, res->channel_count);
 
