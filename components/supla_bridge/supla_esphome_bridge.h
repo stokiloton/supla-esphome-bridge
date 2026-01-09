@@ -18,7 +18,7 @@ namespace supla_esphome_bridge {
 class SuplaEsphomeBridge : public Component {
  public:
   SuplaEsphomeBridge() = default;
-  ~SuplaEsphomeBridge() override = default;
+  ~SuplaEsphomeBridge() = default;
 
   // Konfiguracja
   void set_server(const std::string &server) { server_ = server; }
@@ -34,7 +34,7 @@ class SuplaEsphomeBridge : public Component {
   void loop() override;
 
  protected:
-  // --- public / protected konfiguracja i zasoby ---
+  // Konfiguracja i zasoby
   std::string server_;
   uint32_t location_id_{0};
   uint8_t location_password_[16]{};
@@ -48,7 +48,7 @@ class SuplaEsphomeBridge : public Component {
   sensor::Sensor *temp_sensor_{nullptr};
   light::LightState *switch_light_{nullptr};
 
-  // Metody pomocnicze (widoczne w .cpp)
+  // Metody pomocnicze
   void generate_guid_();
   bool connect_and_register_();  // inicjuje połączenie i wysyła register (nieblokująco)
   bool send_register_();
@@ -60,7 +60,7 @@ class SuplaEsphomeBridge : public Component {
   void send_packet_(const uint8_t *payload, uint16_t size);
 
  private:
-  // --- state machine i timery ---
+  // State machine i timery
   enum class BridgeState : uint8_t {
     DISCONNECTED,
     CONNECTING,
@@ -76,7 +76,7 @@ class SuplaEsphomeBridge : public Component {
   uint32_t last_ping_{0};
   uint32_t last_reconnect_attempt_{0};
 
-  // --- nieblokujący parser przychodzących pakietów ---
+  // Nieblokujący parser przychodzących pakietów
   SuplaPacketHeader pending_header_{};
   bool pending_header_valid_{false};
   uint16_t pending_payload_size_{0};
