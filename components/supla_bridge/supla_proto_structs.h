@@ -1,64 +1,73 @@
 #pragma once
 #include <stdint.h>
-#include <string.h>
 
 // ------------------------------------------------------------
-// Stałe zgodne z SUPLA proto 23 (minimalny zestaw)
+// Stałe kanałów – zgodne z SUPLA
 // ------------------------------------------------------------
 
-#define SUPLA_GUID_SIZE               16
-#define SUPLA_LOCATION_PWD_MAXSIZE    32
-#define SUPLA_SOFTVER_MAXSIZE         16
-#define SUPLA_DEVICE_NAME_MAXSIZE     64
-
-// Typy kanałów (wartości zgodne z oficjalnym protokołem)
-#define SUPLA_CHANNELTYPE_SENSOR_TEMP 40
-#define SUPLA_CHANNELTYPE_RELAY       10
-
-// Typy wartości
-#define SUPLA_VALUE_TYPE_DOUBLE       7
-#define SUPLA_VALUE_TYPE_ONOFF        1
+#define SUPLA_CHANNELTYPE_SENSOR_TEMP  40
+#define SUPLA_CHANNELTYPE_RELAY        10
 
 // ------------------------------------------------------------
-// Podstawowe typy
+// Typy wartości – zgodne z SUPLA
 // ------------------------------------------------------------
 
-// Minimalna definicja GUID używana w Twoim projekcie
+#define SUPLA_VALUE_TYPE_DOUBLE        7
+#define SUPLA_VALUE_TYPE_ONOFF         1
+
+// ------------------------------------------------------------
+// Typy ramek SUPLA (Twoje własne, zgodne z repo)
+// ------------------------------------------------------------
+
+#define SUPLA_SD_DEVICE_REGISTER_RESULT_B   70
+#define SUPLA_SD_CHANNEL_VALUE_CHANGED_B    80
+#define SUPLA_SD_CHANNEL_NEW_VALUE_B        90
+#define SUPLA_SD_PING_CLIENT                100
+
+// ------------------------------------------------------------
+// Struktury VALUE_CHANGED – Twoje własne
+// ------------------------------------------------------------
+
 typedef struct {
-    uint8_t value[SUPLA_GUID_SIZE];
-} SuplaGuid;
+    uint16_t type;           // SUPLA_SD_CHANNEL_VALUE_CHANGED_B
+    uint8_t  channel_number;
+    uint8_t  value_type;     // SUPLA_VALUE_TYPE_DOUBLE
+    double   temperature;
+} SuplaChannelValueChangedTemp_B;
+
+typedef struct {
+    uint16_t type;           // SUPLA_SD_CHANNEL_VALUE_CHANGED_B
+    uint8_t  channel_number;
+    uint8_t  value_type;     // SUPLA_VALUE_TYPE_ONOFF
+    uint8_t  state;
+} SuplaChannelValueChangedRelay_B;
 
 // ------------------------------------------------------------
-// Struktury rejestracyjne SUPLA proto 23
+// Struktura NEW_VALUE – Twoja własna
 // ------------------------------------------------------------
 
-// To jest payload dla „REGISTER_DEVICE_C” w protokole SUPLA.
-// Uwaga: to nie jest pełny SRPC frame – tylko część danych.
 typedef struct {
-    uint8_t   Version;                                   // proto_version (23)
-    SuplaGuid GUID;                                      // GUID urządzenia
-    int32_t   LocationID;
-    char      LocationPassword[SUPLA_LOCATION_PWD_MAXSIZE];
-    int32_t   ManufacturerID;
-    int32_t   ProductID;
-    char      SoftVer[SUPLA_SOFTVER_MAXSIZE];
-    char      Name[SUPLA_DEVICE_NAME_MAXSIZE];
-    uint32_t  Flags;
-    uint8_t   ChannelCount;
-} TSD_SuplaRegisterDevice_C;
+    uint16_t type;           // SUPLA_SD_CHANNEL_NEW_VALUE_B
+    uint8_t  channel_number;
+    uint8_t  value_type;
+    uint8_t  state;
+} SuplaChannelNewValueRelay_B;
 
+// ------------------------------------------------------------
+// Struktura REGISTER_RESULT – Twoja własna
+// ------------------------------------------------------------
 
-// Struktura pojedynczego kanału (odpowiednik ADD_CHANNEL_B)
 typedef struct {
-    uint8_t Number;
-    uint8_t Type;
-    uint8_t ValueType;
-    uint8_t Flags;
-} TSD_Channel_B;
+    uint16_t type;           // SUPLA_SD_DEVICE_REGISTER_RESULT_B
+    uint8_t  result_code;
+    uint32_t device_id;
+    uint8_t  channel_count;
+} SuplaDeviceRegisterResult_B;
 
+// ------------------------------------------------------------
+// Struktura PING – Twoja własna
+// ------------------------------------------------------------
 
-// Zakończenie rejestracji (REGISTER_DEVICE_E – minimalne)
 typedef struct {
-    uint8_t reserved;
-} TSD_SuplaRegisterDevice_E;
-
+    uint16_t type;           // SUPLA_SD_PING_CLIENT
+} SuplaPing_B;
