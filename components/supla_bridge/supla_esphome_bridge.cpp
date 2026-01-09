@@ -39,7 +39,6 @@ static void hex_dump(const char *prefix, const uint8_t *data, int len) {
 
 // ---------------------------------------------------------
 // set_location_password
-// hex string -> 16 bytes
 // ---------------------------------------------------------
 void SuplaEsphomeBridge::set_location_password(const std::string &hex) {
   memset(location_password_, 0, sizeof(location_password_));
@@ -157,8 +156,6 @@ bool SuplaEsphomeBridge::send_register_() {
   // fallback: spróbuj skopiować do LocationPassword jeśli istnieje
   #ifdef TDS_SuplaRegisterDevice_C__HAS_LocationPassword
     memcpy(reg.LocationPassword, location_password_, sizeof(location_password_));
-  #else
-    // jeśli nie ma, ignorujemy (kompilator może wymagać dopasowania do proto.h)
   #endif
 #endif
 
@@ -184,8 +181,6 @@ bool SuplaEsphomeBridge::send_register_() {
 #endif
 
   // channel_count (nowsze proto.h)
-  // defensywnie ustawiamy channel_count jeśli pole istnieje
-  // większość implementacji ma channel_count
   reg.channel_count = 2;
 
   // Przygotuj kanały (najczęściej TDS_SuplaDeviceChannel_B)
@@ -454,11 +449,10 @@ void SuplaEsphomeBridge::handle_incoming_() {
 
   // Brak pending header: spróbuj odczytać header tylko jeśli dostępne co najmniej sizeof(header)
   while (client_.available() >= (int)sizeof(SuplaPacketHeader)) {
-    // Peek header (niektóre implementacje peek zwracają mniej, więc defensywnie sprawdzamy)
     SuplaPacketHeader hdr;
-    int r = client_.peek((uint8_t *)&hdr, sizeof(hdr));
+    int r = client_.read((uint8_t *)&hdr, sizeof(hdr));
     if (r != (int)sizeof(hdr)) {
-      // peek nie zwrócił pełnego headera, przerwij i poczekaj
+      // nie udało się odczytać pełnego headera - przerwij
       return;
     }
 
@@ -481,10 +475,7 @@ void SuplaEsphomeBridge::handle_incoming_() {
     }
 
     // Jeśli cały payload jest już dostępny (header + payload), odczytaj całość
-    if (client_.available() >= (int)(sizeof(hdr) + size)) {
-      // Teraz bezpiecznie odczytujemy header (konsumujemy dane)
-      client_.read((uint8_t *)&hdr, sizeof(hdr));
-      // Odczytaj payload
+    if (client_.available() >= (int)size) {
       client_.read(pending_payload_, size);
 
       uint16_t crc = supla_crc16(pending_payload_, size);
@@ -503,7 +494,7 @@ void SuplaEsphomeBridge::handle_incoming_() {
       continue;
     } else {
       // Payload nie jest jeszcze w całości dostępny -> zapisz header i poczekaj
-      client_.read((uint8_t *)&pending_header_, sizeof(pending_header_));
+      pending_header_ = hdr;
       pending_payload_size_ = size;
       pending_header_valid_ = true;
       return;
