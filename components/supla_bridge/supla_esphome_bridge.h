@@ -50,4 +50,10 @@ class SuplaEsphomeBridge : public Component {
   void send_value_temp_();
   void send_value_relay_();
   void send_ping_();
-  void handle_incoming
+  void handle_incoming_();
+
+  void send_packet_(const uint8_t *payload, uint16_t size);
+};
+
+}  // namespace supla_esphome_bridge
+}  // namespace esphome
