@@ -160,39 +160,56 @@ bool SuplaEsphomeBridge::connect_and_register_() {
 // SEND REGISTER PACKET
 // ---------------------------------------------------------
 bool SuplaEsphomeBridge::send_register_() {
-  SuplaDeviceRegister_B reg{};
-  reg.type = SUPLA_SD_DEVICE_REGISTER_B;
-  reg.proto_version = 17;
+    TSD_SuplaRegisterDevice_C reg{};
+    memset(&reg, 0, sizeof(reg));
 
-  memset(reg.software_version, 0, sizeof(reg.software_version));
-  strncpy(reg.software_version, "1.0", sizeof(reg.software_version) - 1);
+    reg.Version = 23;
+    reg.GUID = guid_;
+    reg.LocationID = location_id_;
+    memcpy(reg.LocationPassword, location_password_, SUPLA_LOCATION_PWD_MAXSIZE);
 
-  reg.guid = guid_;
-  reg.location_id = location_id_;
-  memcpy(reg.location_password, location_password_, sizeof(location_password_));
+    reg.ManufacturerID = 0;
+    reg.ProductID = 0;
 
-  reg.manufacturer_id = 0;
-  reg.product_id = 0;
+    strncpy(reg.SoftVer, "1.0", SUPLA_SOFTVER_MAXSIZE - 1);
+    strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE - 1);
 
-  memset(reg.device_name, 0, sizeof(reg.device_name));
-  strncpy(reg.device_name, device_name_.c_str(), sizeof(reg.device_name) - 1);
+    reg.Flags = 0;
+    reg.ChannelCount = 2;
 
-  reg.channel_count = 2;
+    // Wyślij ramkę rejestracyjną C
+    hex_dump("TX REGISTER_C", (uint8_t *)&reg, sizeof(reg));
+    send_packet_((uint8_t *)&reg, sizeof(reg));
 
-  reg.channels[0].channel_number = 0;
-  reg.channels[0].type = SUPLA_CHANNELTYPE_SENSOR_TEMP;
-  reg.channels[0].value_type = SUPLA_VALUE_TYPE_DOUBLE;
+    // --- Kanał 0: temperatura ---
+    TSD_Channel_B ch0{};
+    memset(&ch0, 0, sizeof(ch0));
+    ch0.Number = 0;
+    ch0.Type = SUPLA_CHANNELTYPE_SENSOR_TEMP;
+    ch0.ValueType = SUPLA_VALUE_TYPE_DOUBLE;
 
-  reg.channels[1].channel_number = 1;
-  reg.channels[1].type = SUPLA_CHANNELTYPE_RELAY;
-  reg.channels[1].value_type = SUPLA_VALUE_TYPE_ONOFF;
+    hex_dump("TX CHANNEL_B #0", (uint8_t *)&ch0, sizeof(ch0));
+    send_packet_((uint8_t *)&ch0, sizeof(ch0));
 
-  hex_dump("TX REGISTER", (uint8_t *)&reg, sizeof(reg));
+    // --- Kanał 1: przekaźnik ---
+    TSD_Channel_B ch1{};
+    memset(&ch1, 0, sizeof(ch1));
+    ch1.Number = 1;
+    ch1.Type = SUPLA_CHANNELTYPE_RELAY;
+    ch1.ValueType = SUPLA_VALUE_TYPE_ONOFF;
 
-  send_packet_((uint8_t *)&reg, sizeof(reg));
+    hex_dump("TX CHANNEL_B #1", (uint8_t *)&ch1, sizeof(ch1));
+    send_packet_((uint8_t *)&ch1, sizeof(ch1));
 
-  ESP_LOGI(TAG, "SUPLA registration sent");
-  return true;
+    // --- Zakończenie rejestracji (REGISTER_E) ---
+    TSD_SuplaRegisterDevice_E reg_e{};
+    memset(&reg_e, 0, sizeof(reg_e));
+
+    hex_dump("TX REGISTER_E", (uint8_t *)&reg_e, sizeof(reg_e));
+    send_packet_((uint8_t *)&reg_e, sizeof(reg_e));
+
+    ESP_LOGI(TAG, "SUPLA registration (proto 23) sent");
+    return true;
 }
 
 // ---------------------------------------------------------
