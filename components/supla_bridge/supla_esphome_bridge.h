@@ -27,7 +27,7 @@
 // --- Konfiguracja SSL ---
 // Jeśli chcesz akceptować dowolny certyfikat (insecure), odkomentuj poniższą linię.
 // Uwaga: to wyłącza weryfikację TLS i jest niezalecane w produkcji.
-// #define USE_SSL_INSECURE
+#define USE_SSL_INSECURE
 
 // Jeśli chcesz weryfikować serwer przez root CA, wklej PEM poniżej (zachowaj format PEM).
 // Przykład:
