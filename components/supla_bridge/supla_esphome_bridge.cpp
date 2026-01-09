@@ -1,18 +1,22 @@
 // supla_esphome_bridge.cpp
-// Zmodyfikowany plik: logowanie nagłówka SUPLA przed wysłaniem,
-// ograniczony hex_dump (pierwsze 64 bajty), chunked send_packet_,
-// oraz logowanie nagłówka przy odbiorze.
-// Dostosowany do nagłówka supla_esphome_bridge.h (SecureClient client_).
+// Poprawiony plik z diagnostykami: reset reason, free heap logs,
+// zmodyfikowany send_packet_ (chunking, timeouts, heap logs),
+// ograniczony hex_dump (pierwsze 64 bajty) i domyślny port TLS = 2016.
 
 #include "supla_esphome_bridge.h"
 #include "esphome/core/log.h"
 
 #if defined(ESP8266)
-#include <ESP8266WiFi.h>
-#include <WiFiClientSecureBearSSL.h>
+  #include <ESP8266WiFi.h>
+  #include <ESP.h>
+  #include <WiFiClientSecureBearSSL.h>
 #elif defined(ESP32)
-#include <WiFi.h>
-#include <WiFiClientSecure.h>
+  #include <WiFi.h>
+  #include <esp_system.h>
+  #include <WiFiClientSecure.h>
+#else
+  #include <WiFi.h>
+  #include <WiFiClientSecure.h>
 #endif
 
 #include "proto.h"
@@ -91,11 +95,10 @@ void SuplaEsphomeBridge::generate_guid_() {
 }
 
 // ---------------------------------------------------------
-// init TLS client (jeśli używasz SUPLA_ROOT_CA_PEM lub setInsecure)
+// init_tls_client_
 // ---------------------------------------------------------
 void SuplaEsphomeBridge::init_tls_client_() {
 #if defined(ESP8266)
-  // BearSSL client: setInsecure() lub setTrustAnchors
   #ifdef USE_SSL_INSECURE
     ESP_LOGW(TAG, "TLS: using INSECURE mode (accept any cert)");
     client_.setInsecure();
@@ -123,7 +126,6 @@ void SuplaEsphomeBridge::init_tls_client_() {
     #endif
   #endif
 #else
-  // Fallback
   #ifdef USE_SSL_INSECURE
     client_.setInsecure();
   #else
@@ -140,6 +142,17 @@ void SuplaEsphomeBridge::setup() {
   generate_guid_();
   init_tls_client_();
 
+  // Log reset reason
+#if defined(ESP32)
+  esp_reset_reason_t rr = esp_reset_reason();
+  ESP_LOGI(TAG, "Reset reason (esp_reset_reason) = %d", (int)rr);
+#elif defined(ESP8266)
+  // ESP.getResetInfo() returns a String with info; ESP.getResetReason() may not be available
+  ESP_LOGI(TAG, "Reset info: %s", ESP.getResetInfo().c_str());
+#else
+  ESP_LOGI(TAG, "Reset reason: unknown platform");
+#endif
+
   // inicjalizacja timerów i stanu
   if (state_ == BridgeState::DISCONNECTED) {
     connect_start_ms_ = millis();
@@ -147,6 +160,11 @@ void SuplaEsphomeBridge::setup() {
   last_send_ = millis();
   last_ping_ = millis();
   last_reconnect_attempt_ = 0;
+
+  // Log free heap at startup
+#if defined(ESP32) || defined(ESP8266)
+  ESP_LOGI(TAG, "Free heap at setup: %u", ESP.getFreeHeap());
+#endif
 }
 
 // ---------------------------------------------------------
@@ -163,8 +181,8 @@ void SuplaEsphomeBridge::start_connect_() {
   connect_start_ms_ = millis();
   state_ = BridgeState::CONNECTING;
 
-  // Domyślny port TLS dla SUPLA to 2016; jeśli Twój serwer używa 443, 2016 zmień tutaj.
-  const uint16_t tls_port = 443;
+  // Ustawienie portu TLS: domyślnie 2016 dla SUPLA TLS
+  const uint16_t tls_port = 2016;
 
   if (client_.connect(server_.c_str(), tls_port)) {
     ESP_LOGI(TAG, "TLS TCP connect ok, sending register");
@@ -179,7 +197,7 @@ void SuplaEsphomeBridge::start_connect_() {
 }
 
 // ---------------------------------------------------------
-// connect_and_register_ (publiczna metoda kompatybilności)
+// connect_and_register_
 // ---------------------------------------------------------
 bool SuplaEsphomeBridge::connect_and_register_() {
   if (state_ != BridgeState::DISCONNECTED) return false;
@@ -188,7 +206,7 @@ bool SuplaEsphomeBridge::connect_and_register_() {
 }
 
 // ---------------------------------------------------------
-// send_packet_ (log header, chunked send header+payload)
+// send_packet_ (log header, chunked send header+payload, diagnostics)
 // ---------------------------------------------------------
 void SuplaEsphomeBridge::send_packet_(const uint8_t *payload, uint16_t size) {
   if (!client_.connected()) {
@@ -199,15 +217,24 @@ void SuplaEsphomeBridge::send_packet_(const uint8_t *payload, uint16_t size) {
   SuplaPacketHeader hdr;
   supla_prepare_header(hdr, size, payload);
 
-  // Log nagłówka
-  ESP_LOGI(TAG, "TX SUPLA HDR: marker=%c%c%c data_size=%u crc=0x%04X",
-           hdr.marker[0], hdr.marker[1], hdr.marker[2],
+  // Diagnostics: free heap and CRC check
+#if defined(ESP32) || defined(ESP8266)
+  ESP_LOGI(TAG, "send_packet_: hdr.data_size=%u hdr.crc=0x%04X free_heap_before=%u",
+           (unsigned)hdr.data_size, (unsigned)hdr.crc16, ESP.getFreeHeap());
+#else
+  ESP_LOGI(TAG, "send_packet_: hdr.data_size=%u hdr.crc=0x%04X",
            (unsigned)hdr.data_size, (unsigned)hdr.crc16);
+#endif
 
-  // Pokaż pierwsze 64 bajty nagłówka (zwykle header jest krótki)
+  uint16_t crc_local = supla_crc16(payload, size);
+  if (crc_local != hdr.crc16) {
+    ESP_LOGW(TAG, "CRC mismatch BEFORE send: hdr_crc=0x%04X calc_crc=0x%04X", hdr.crc16, crc_local);
+  }
+
+  // Log header bytes (limited)
   hex_dump_limited("TX SUPLA_HDR_BYTES", reinterpret_cast<const uint8_t *>(&hdr), (int)sizeof(hdr));
 
-  // Chunked send: header, potem payload, w kawałkach po 128B
+  // Chunked send: header then payload
   const uint8_t *parts[2] = { reinterpret_cast<const uint8_t *>(&hdr), payload };
   const size_t parts_size[2] = { sizeof(hdr), size };
   const unsigned long start = millis();
@@ -241,7 +268,7 @@ void SuplaEsphomeBridge::send_packet_(const uint8_t *payload, uint16_t size) {
       remaining -= written;
       ptr += written;
 
-      // Nie blokuj watchdog, daj systemowi chwilę
+      // yield to avoid watchdog
       delay(0);
 
       if (millis() - start > 2000) {
@@ -251,6 +278,12 @@ void SuplaEsphomeBridge::send_packet_(const uint8_t *payload, uint16_t size) {
       }
     }
   }
+
+#if defined(ESP32) || defined(ESP8266)
+  ESP_LOGI(TAG, "send_packet_ done, elapsed=%lums free_heap_after=%u", millis() - start, ESP.getFreeHeap());
+#else
+  ESP_LOGI(TAG, "send_packet_ done, elapsed=%lums", millis() - start);
+#endif
 }
 
 // ---------------------------------------------------------
@@ -299,8 +332,6 @@ bool SuplaEsphomeBridge::send_register_() {
   #else
     #ifdef HAS_ChannelCount_FIELD
       reg.ChannelCount = 2;
-    #else
-      // fallback: jeśli nie ma pola, nic nie robimy
     #endif
   #endif
 
@@ -349,7 +380,6 @@ bool SuplaEsphomeBridge::send_register_() {
   hex_dump_limited("TX CHANNEL_B #1", reinterpret_cast<uint8_t *>(&reg.channels[1]), (int)sizeof(reg.channels[1]));
   send_packet_(reinterpret_cast<uint8_t *>(&reg.channels[1]), (uint16_t)sizeof(reg.channels[1]));
 #else
-  // fallback minimalny
   uint8_t chbuf[16];
   memset(chbuf, 0, sizeof(chbuf));
   chbuf[0] = 0;
