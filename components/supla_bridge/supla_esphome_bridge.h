@@ -8,7 +8,7 @@
 
 #include "supla_suml.h"
 #include "supla_proto_structs.h"
-#include "supla_bridge/supla_official/proto.h"
+#include "proto.h"
 
 namespace esphome {
 namespace supla_esphome_bridge {
