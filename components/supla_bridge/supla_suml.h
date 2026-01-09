@@ -1,24 +1,16 @@
 #pragma once
 #include <stdint.h>
-#include <string.h>
-#include "supla_crc16.h"
 
-#pragma pack(push, 1)
+#define SUPLA_GUID_SIZE 16
 
-struct SuplaPacketHeader {
-  uint8_t marker[3];   // 'S','U','P'
-  uint8_t version;     // 17 dla proto v17
-  uint16_t data_size;
-  uint16_t crc16;
-};
+typedef struct {
+    uint8_t value[SUPLA_GUID_SIZE];
+} SuplaGuid;
 
-#pragma pack(pop)
-
-static inline void supla_prepare_header(SuplaPacketHeader &hdr, uint16_t size, const uint8_t *payload) {
-  hdr.marker[0] = 'S';
-  hdr.marker[1] = 'U';
-  hdr.marker[2] = 'P';
-  hdr.version = 17;  // proto_version = 17
-  hdr.data_size = size;
-  hdr.crc16 = supla_crc16(payload, size);
-}
+// To jest Twój własny, prosty nagłówek SUM-L dla send_packet_.
+// SRPC nie musi o nim wiedzieć – SRPC operuje na "surowych" danych.
+typedef struct {
+    uint8_t  version;
+    uint8_t  type;
+    uint16_t length;  // długość payloadu bez nagłówka
+} SuplaPacketHeader;
