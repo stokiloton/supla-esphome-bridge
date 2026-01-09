@@ -146,7 +146,7 @@ bool SuplaEsphomeBridge::connect_and_register_() {
       ESP_LOGI(TAG, "Packet type: %u", type);
 
       if (type == SUPLA_SD_DEVICE_REGISTER_RESULT_B) {
-        auto *res = (TDS_SuplaDeviceRegisterResult_B *) buf;
+        auto *res = (SuplaDeviceRegisterResult_B *) buf;
         ESP_LOGI(TAG, "REGISTER RESULT: result=%u device_id=%u channels=%u",
                  res->result_code, res->device_id, res->channel_count);
 
@@ -176,7 +176,7 @@ bool SuplaEsphomeBridge::connect_and_register_() {
 
 bool SuplaEsphomeBridge::send_register_() {
   // REGISTER_DEVICE_C – struktura z proto.h
-  TDS_SuplaRegisterDevice_C reg{};
+  SuplaRegisterDevice_C reg{};
   memset(&reg, 0, sizeof(reg));
 
   reg.Version = 23;
@@ -199,7 +199,7 @@ bool SuplaEsphomeBridge::send_register_() {
   send_packet_(reinterpret_cast<uint8_t *>(&reg), sizeof(reg));
 
   // CHANNEL 0
-  TDS_Channel_B ch0{};
+  Channel_B ch0{};
   ch0.Number = 0;
   ch0.Type = SUPLA_CHANNELTYPE_SENSOR_TEMP;
   ch0.ValueType = SUPLA_VALUE_TYPE_DOUBLE;
@@ -208,7 +208,7 @@ bool SuplaEsphomeBridge::send_register_() {
   send_packet_(reinterpret_cast<uint8_t *>(&ch0), sizeof(ch0));
 
   // CHANNEL 1
-  TDS_Channel_B ch1{};
+  Channel_B ch1{};
   ch1.Number = 1;
   ch1.Type = SUPLA_CHANNELTYPE_RELAY;
   ch1.ValueType = SUPLA_VALUE_TYPE_ONOFF;
@@ -217,7 +217,7 @@ bool SuplaEsphomeBridge::send_register_() {
   send_packet_(reinterpret_cast<uint8_t *>(&ch1), sizeof(ch1));
 
   // REGISTER_DEVICE_E
-  TDS_SuplaRegisterDevice_E reg_e{};
+  SuplaRegisterDevice_E reg_e{};
   hex_dump("TX REGISTER_E", reinterpret_cast<uint8_t *>(&reg_e), sizeof(reg_e));
   send_packet_(reinterpret_cast<uint8_t *>(&reg_e), sizeof(reg_e));
 
