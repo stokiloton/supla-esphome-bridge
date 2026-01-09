@@ -169,7 +169,7 @@ void SuplaEsphomeBridge::start_connect_() {
   state_ = BridgeState::CONNECTING;
 
   // Domyślny port TLS ustawiony na 443 zgodnie z życzeniem
-  const uint16_t tls_port = 443;
+  const uint16_t tls_port = 2016;
 
 #if defined(ESP32)
   // Ustaw SNI (server name) na ESP32
