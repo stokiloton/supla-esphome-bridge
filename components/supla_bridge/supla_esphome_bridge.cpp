@@ -7,7 +7,7 @@
 #include <WiFi.h>
 #endif
 
-#include "supla_bridge/supla_official/proto.h"
+#include "proto.h"
 
 namespace esphome {
 namespace supla_esphome_bridge {
