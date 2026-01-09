@@ -163,8 +163,8 @@ void SuplaEsphomeBridge::start_connect_() {
   connect_start_ms_ = millis();
   state_ = BridgeState::CONNECTING;
 
-  // Domyślny port TLS dla SUPLA to 2016; jeśli Twój serwer używa 443, zmień tutaj.
-  const uint16_t tls_port = 2016;
+  // Domyślny port TLS dla SUPLA to 2016; jeśli Twój serwer używa 443, 2016 zmień tutaj.
+  const uint16_t tls_port = 443;
 
   if (client_.connect(server_.c_str(), tls_port)) {
     ESP_LOGI(TAG, "TLS TCP connect ok, sending register");
