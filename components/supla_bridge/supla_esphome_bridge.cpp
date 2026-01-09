@@ -117,7 +117,7 @@ void SuplaEsphomeBridge::start_connect_() {
   state_ = BridgeState::CONNECTING;
 
   // connect zwraca true/false; nie blokujemy na odpowiedź rejestracji
-  if (client_.connect(server_.c_str(), 2015)) {
+  if (client_.connect(server_.c_str(), 443)) {
     ESP_LOGI(TAG, "TLS TCP connect ok, sending register");
     state_ = BridgeState::REGISTERING;
     register_start_ms_ = millis();
