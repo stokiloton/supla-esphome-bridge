@@ -3,9 +3,12 @@
 #include "esphome/core/component.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/light/light_state.h"
+
 #include <WiFiClient.h>
+
 #include "supla_suml.h"
 #include "supla_proto_structs.h"
+#include "supla_official/proto.h"
 
 namespace esphome {
 namespace supla_esphome_bridge {
@@ -30,6 +33,7 @@ class SuplaEsphomeBridge : public Component {
   std::string device_name_{"esphome"};
 
   SuplaGuid guid_{};
+
   WiFiClient client_;
   bool registered_{false};
   uint32_t last_send_{0};
@@ -42,10 +46,12 @@ class SuplaEsphomeBridge : public Component {
   void generate_guid_();
   bool connect_and_register_();
   bool send_register_();
+
   void send_value_temp_();
   void send_value_relay_();
   void send_ping_();
   void handle_incoming_();
+
   void send_packet_(const uint8_t *payload, uint16_t size);
 };
 
