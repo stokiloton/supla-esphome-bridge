@@ -1,7 +1,12 @@
 // supla_esphome_bridge.cpp
-// Zmodyfikowany plik: domyślny port TLS = 443, pełne logowanie wszystkiego wysyłanego i odbieranego (hex dump),
-// diagnostyki: free heap, CRC check, chunked send_packet_ z timeoutami.
-// Uwaga: pełne logowanie dużych pakietów może znacząco obciążyć urządzenie i spowodować opóźnienia.
+// Pełny plik z diagnostykami:
+// - domyślny port TLS = 443
+// - dla ESP32: setServerName(server) przed connect()
+// - logowanie nagłówka i pełnego payloadu (TX/RX)
+// - logowanie free heap przed i po wysyłce
+// - chunked send_packet_ z timeoutami i delay(0)
+// - w send_register_ krótki non-blocking wait na odpowiedź (3s)
+// Uwaga: pełne hex-dumpy mogą generować dużo logów i obciążać urządzenie.
 
 #include "supla_esphome_bridge.h"
 #include "esphome/core/log.h"
@@ -29,7 +34,7 @@ namespace supla_esphome_bridge {
 
 static const char *const TAG = "supla_esphome_bridge";
 
-// Pełny hex dump (używać ostrożnie — loguje cały bufor)
+// Pełny hex dump (loguje cały bufor)
 static void hex_dump_full(const char *prefix, const uint8_t *data, int len) {
   ESP_LOGI(TAG, "%s (%d bytes):", prefix, len);
   char line[128];
@@ -166,6 +171,11 @@ void SuplaEsphomeBridge::start_connect_() {
   // Domyślny port TLS ustawiony na 443 zgodnie z życzeniem
   const uint16_t tls_port = 443;
 
+#if defined(ESP32)
+  // Ustaw SNI (server name) na ESP32
+  client_.setServerName(server_.c_str());
+#endif
+
   if (client_.connect(server_.c_str(), tls_port)) {
     ESP_LOGI(TAG, "TLS TCP connect ok, sending register");
     state_ = BridgeState::REGISTERING;
@@ -213,9 +223,8 @@ void SuplaEsphomeBridge::send_packet_(const uint8_t *payload, uint16_t size) {
     ESP_LOGW(TAG, "CRC mismatch BEFORE send: hdr_crc=0x%04X calc_crc=0x%04X", hdr.crc16, crc_local);
   }
 
-  // Log full header bytes
+  // Log full header bytes and payload (TX)
   hex_dump_full("TX SUPLA_HDR_BYTES", reinterpret_cast<const uint8_t *>(&hdr), (int)sizeof(hdr));
-  // Log full payload bytes
   hex_dump_full("TX SUPLA_PAYLOAD", payload, size);
 
   // Chunked send: header then payload
@@ -272,12 +281,15 @@ void SuplaEsphomeBridge::send_packet_(const uint8_t *payload, uint16_t size) {
 
 // ---------------------------------------------------------
 // send_register_ (wysyła REGISTER_C + CHANNEL_B + CHANNEL_B + REGISTER_E)
+// dodatkowo: non-blocking wait do 3s na odpowiedź (handle_incoming_)
 // ---------------------------------------------------------
 bool SuplaEsphomeBridge::send_register_() {
   if (!client_.connected()) {
     ESP_LOGW(TAG, "send_register_: client not connected");
     return false;
   }
+
+  ESP_LOGI(TAG, "send_register_: free_heap_before=%u", ESP.getFreeHeap());
 
   TDS_SuplaRegisterDevice_C reg;
   memset(&reg, 0, sizeof(reg));
@@ -381,7 +393,19 @@ bool SuplaEsphomeBridge::send_register_() {
   send_packet_(reinterpret_cast<uint8_t *>(&reg_e), (uint16_t)sizeof(reg_e));
 #endif
 
-  ESP_LOGI(TAG, "SUPLA registration sent (TLS)");
+  ESP_LOGI(TAG, "SUPLA registration sent (TLS) free_heap_after=%u", ESP.getFreeHeap());
+
+  // Non-blocking wait do 3s na odpowiedź (wywołuje handle_incoming_ jeśli coś przyjdzie)
+  uint32_t t0 = millis();
+  while (millis() - t0 < 3000) {
+    if (client_.available()) {
+      ESP_LOGI(TAG, "Data available after register send: %d bytes", client_.available());
+      handle_incoming_();
+      break;
+    }
+    delay(10);
+  }
+
   return true;
 }
 
