@@ -135,7 +135,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   hex_dump((const uint8_t*)&reg, payload_size, "REG-PAYLOAD");
 
   // -------------------------
-  // Build SDP using sproto_pop_out_data()
+  // Build SDP (RAW MODE)
   // -------------------------
   TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
   if (!sdp) {
@@ -154,29 +154,23 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   }
 
   // -------------------------
-  // Extract encoded packet
+  // RAW SEND (TSuplaDataPacket)
   // -------------------------
-  char outbuf[4096];
-  unsigned _supla_int_t outlen =
-      sproto_pop_out_data(sproto_ctx_, outbuf, sizeof(outbuf));
+  size_t packet_len =
+      sizeof(TSuplaDataPacket) - SUPLA_MAX_DATA_SIZE + sdp->data_size;
 
-  if (outlen == 0) {
-    ESP_LOGW("supla", "sproto_pop_out_data returned 0");
-    sproto_sdp_free(sdp);
-    client_.stop();
-    return false;
-  }
+  ESP_LOGI("supla", "Sending raw TSuplaDataPacket (call_id=%u), len=%u",
+           call_id, (unsigned)packet_len);
 
-  ESP_LOGI("supla", "Sending register SDP (call_id=%u), bytes=%u",
-           call_id, (unsigned)outlen);
-  hex_dump((uint8_t*)outbuf, outlen, "TX");
+  hex_dump((uint8_t*)sdp, packet_len, "TX");
 
-  size_t sent = client_.write((uint8_t*)outbuf, outlen);
+  size_t sent = client_.write((uint8_t*)sdp, packet_len);
   client_.flush();
   sproto_sdp_free(sdp);
 
-  if (sent != outlen) {
-    ESP_LOGW("supla", "Sent mismatch: %u != %u", (unsigned)sent, (unsigned)outlen);
+  if (sent != packet_len) {
+    ESP_LOGW("supla", "Sent mismatch: %u != %u",
+             (unsigned)sent, (unsigned)packet_len);
     client_.stop();
     return false;
   }
