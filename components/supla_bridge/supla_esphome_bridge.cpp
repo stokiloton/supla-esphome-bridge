@@ -1,5 +1,6 @@
 #include "supla_esphome_bridge.h"
 #include <cstddef>  // offsetof
+#include <cstring>
 
 namespace supla_esphome_bridge {
 
@@ -10,7 +11,6 @@ const uint8_t SuplaEsphomeBridge::GUID_BIN[SUPLA_GUID_SIZE] = {
 };
 
 SuplaEsphomeBridge::SuplaEsphomeBridge() {
-  // Inicjalizacja sproto i ustawienie wersji protokołu na SUPLA_PROTO_VERSION (z proto.h)
   sproto_ctx_ = sproto_init();
   if (sproto_ctx_) {
 #ifdef SUPLA_PROTO_VERSION
@@ -39,7 +39,6 @@ void SuplaEsphomeBridge::loop() {
   static unsigned long last_try = 0;
   if (!registered_ && millis() - last_try > 30000) {
     last_try = millis();
-    // zwiększony timeout rejestracji do 10s
     register_device(10000);
   }
 }
@@ -75,7 +74,6 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
     return false;
   }
 
-  // Używamy wyłącznie call_id G (SUPLA_DS_CALL_REGISTER_DEVICE_G)
 #ifdef SUPLA_DS_CALL_REGISTER_DEVICE_G
   const unsigned call_id = SUPLA_DS_CALL_REGISTER_DEVICE_G;
 #else
@@ -109,43 +107,34 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
     reg.SoftVer[SUPLA_SOFTVER_MAXSIZE - 1] = 0;
   }
 
-  // --- Dodajemy minimalny 1 kanał ---
+  // --- Dodajemy minimalny 1 kanał zgodny z TDS_SuplaDeviceChannel_E ---
   reg.channel_count = 1;
-
-  // Wyzeruj pierwszy kanał
   memset(&reg.channels[0], 0, sizeof(reg.channels[0]));
 
-  // Ustaw minimalne, typowe pola kanału.
-  // Jeśli Twoja wersja proto.h używa innych nazw pól, dopasuj je odpowiednio.
-  // Najczęściej spotykane pola: Number, Type, Func, Caption
-  reg.channels[0].Number = 0;  // numer kanału
-  reg.channels[0].Type = SUPLA_CHANNELTYPE_THERMOMETER;  // typ: termometr
-  reg.channels[0].Func = SUPLA_CHANNELFNC_THERMOMETER;   // funkcja: termometr
+  // Pola zgodne z TDS_SuplaDeviceChannel_E
+  reg.channels[0].Number = 0;
+  reg.channels[0].Type = SUPLA_CHANNELTYPE_THERMOMETER;
 
-  // Caption / opis kanału (jeśli pole istnieje)
-  const char *ch_caption = "Temp";
-  // Niektóre implementacje mają pole Caption lub CaptionUTF8; próbujemy bezpiecznie skopiować
-#if defined(SUPLA_CHANNEL_CAPTION_MAXSIZE)
-  size_t chcap = (SUPLA_CHANNEL_CAPTION_MAXSIZE > 0) ? (SUPLA_CHANNEL_CAPTION_MAXSIZE - 1) : 0;
-  if (chcap && sizeof(reg.channels[0].Caption) >= chcap + 1) {
-    strncpy(reg.channels[0].Caption, ch_caption, chcap);
-    reg.channels[0].Caption[chcap] = 0;
-  } else {
-    // Fallback: jeśli pole Caption istnieje i jest mniejsze, kopiujemy tyle ile się zmieści
-    if (sizeof(reg.channels[0].Caption) > 0) {
-      size_t cc = sizeof(reg.channels[0].Caption) - 1;
-      strncpy(reg.channels[0].Caption, ch_caption, cc);
-      reg.channels[0].Caption[cc] = 0;
-    }
-  }
+  // Ustawiamy FuncList na typową wartość dla termometru (bit THERMOMETER)
+  // SUPLA_BIT_FUNC_THERMOMETER z proto.h = 0x00000100
+#ifdef SUPLA_BIT_FUNC_THERMOMETER
+  reg.channels[0].FuncList = ( _supla_int_t ) SUPLA_BIT_FUNC_THERMOMETER;
 #else
-  // Jeśli nie ma makra, spróbuj bezpiecznie skopiować do pola Caption jeśli istnieje
-  if (sizeof(reg.channels[0].Caption) > 0) {
-    size_t cc = sizeof(reg.channels[0].Caption) - 1;
-    strncpy(reg.channels[0].Caption, ch_caption, cc);
-    reg.channels[0].Caption[cc] = 0;
-  }
+  reg.channels[0].FuncList = 0x00000100;
 #endif
+
+  // Default, Flags, Offline, ValueValidityTimeSec
+  reg.channels[0].Default = 0;
+  reg.channels[0].Flags = 0;
+  reg.channels[0].Offline = 0;
+  reg.channels[0].ValueValidityTimeSec = 0;
+
+  // Wyczyść wartość (value[SUPLA_CHANNELVALUE_SIZE])
+  memset(reg.channels[0].value, 0, SUPLA_CHANNELVALUE_SIZE);
+
+  // DefaultIcon i SubDeviceId
+  reg.channels[0].DefaultIcon = 0;
+  reg.channels[0].SubDeviceId = 0;
 
   // Oblicz rzeczywisty rozmiar payloadu: offset do channels + channel_count * sizeof(channel)
   size_t payload_size = offsetof(TDS_SuplaRegisterDevice, channels);
@@ -198,7 +187,6 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
     client_.stop();
     return false;
   }
-  // Ustaw no-delay i wyślij
   client_.setNoDelay(true);
   ESP_LOGI("supla", "Sending register SDP (call_id=%u), bytes=%u", call_id, (unsigned)outlen);
   hex_dump((const uint8_t*)outbuf, outlen, "TX");
@@ -264,10 +252,8 @@ bool SuplaEsphomeBridge::read_register_response(WiFiClient &client, unsigned lon
       ESP_LOGI("supla", "Received %d bytes from SUPLA", r);
       hex_dump((const uint8_t*)inbuf, (size_t)r, "RX");
 
-      // Dodaj do sproto input buffer
       sproto_in_buffer_append(sproto_ctx_, inbuf, (unsigned _supla_int_t)r);
 
-      // Parsuj SDP-y
       TSuplaDataPacket sdp;
       while (sproto_pop_in_sdp(sproto_ctx_, &sdp)) {
         ESP_LOGI("supla", "Parsed SDP: call_id=%u data_size=%u", (unsigned)sdp.call_id, (unsigned)sdp.data_size);
