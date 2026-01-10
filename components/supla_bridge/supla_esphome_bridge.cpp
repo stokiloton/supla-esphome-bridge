@@ -1,6 +1,6 @@
 #include "supla_esphome_bridge.h"
 #include <cstddef>   // offsetof
-#include <cstring>   // memset, strncpy
+#include <cstring>   // memset, strncpy, memcpy
 #include <cstdint>
 
 namespace supla_esphome_bridge {
@@ -38,9 +38,9 @@ void SuplaEsphomeBridge::setup() {
 
 void SuplaEsphomeBridge::loop() {
   static unsigned long last_try = 0;
-  if (!registered_ && millis() - last_try > 20000) {
+  if (!registered_ && millis() - last_try > 10000) {
     last_try = millis();
-    register_device(10000);
+    register_device(30000);
   }
 }
 
@@ -112,27 +112,40 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
     reg.SoftVer[SUPLA_SOFTVER_MAXSIZE - 1] = 0;
   }
 
-  // --- Add one minimal channel (TDS_SuplaDeviceChannel_E layout) ---
+  // --- Add one minimal channel using TDS_SuplaDeviceChannel_E as a temporary buffer ---
   reg.channel_count = 1;
   memset(&reg.channels[0], 0, sizeof(reg.channels[0]));
 
-  // Fields present in TDS_SuplaDeviceChannel_E
-  reg.channels[0].Number = 0;
-  reg.channels[0].Type = SUPLA_CHANNELTYPE_THERMOMETER;
-
-#ifdef SUPLA_BIT_FUNC_THERMOMETER
-  reg.channels[0].FuncList = (_supla_int_t)SUPLA_BIT_FUNC_THERMOMETER;
-#else
-  reg.channels[0].FuncList = (_supla_int_t)0x00000100;
+  // Build a channel in the "E" layout (ver >= 25) then copy only as many bytes
+  // as fit into the actual reg.channels[0] (which may be an older/smaller struct).
+#ifdef __cplusplus
+  // Ensure the E-struct type name is available; user provided its typedef earlier.
 #endif
 
-  reg.channels[0].Default = 0;
-  reg.channels[0].Flags = 0;
-  reg.channels[0].Offline = 0;
-  reg.channels[0].ValueValidityTimeSec = 0;
-  memset(reg.channels[0].value, 0, SUPLA_CHANNELVALUE_SIZE);
-  reg.channels[0].DefaultIcon = 0;
-  reg.channels[0].SubDeviceId = 0;
+  // Create local E-structure and fill it
+  TDS_SuplaDeviceChannel_E ch_e;
+  memset(&ch_e, 0, sizeof(ch_e));
+
+  ch_e.Number = 0;
+  ch_e.Type = SUPLA_CHANNELTYPE_THERMOMETER;
+
+#ifdef SUPLA_BIT_FUNC_THERMOMETER
+  ch_e.FuncList = (_supla_int_t)SUPLA_BIT_FUNC_THERMOMETER;
+#else
+  ch_e.FuncList = (_supla_int_t)0x00000100;
+#endif
+
+  ch_e.Default = 0;
+  ch_e.Flags = 0;
+  ch_e.Offline = 0;
+  ch_e.ValueValidityTimeSec = 0;
+  memset(ch_e.value, 0, SUPLA_CHANNELVALUE_SIZE);
+  ch_e.DefaultIcon = 0;
+  ch_e.SubDeviceId = 0;
+
+  // Copy only the minimum of sizes to avoid referencing non-existing fields
+  size_t copy_sz = sizeof(reg.channels[0]) < sizeof(ch_e) ? sizeof(reg.channels[0]) : sizeof(ch_e);
+  memcpy(&reg.channels[0], &ch_e, copy_sz);
 
   // Compute actual payload size: header up to channels + channel_count * sizeof(channel)
   size_t payload_size = offsetof(TDS_SuplaRegisterDevice, channels);
