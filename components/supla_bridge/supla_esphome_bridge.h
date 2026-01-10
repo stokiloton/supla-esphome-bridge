@@ -7,6 +7,7 @@
 #include <string>
 
 #include "proto.h"
+#include "srpc.h"
 
 namespace supla_esphome_bridge {
 
@@ -20,6 +21,10 @@ class SuplaEsphomeBridge : public esphome::Component {
   void set_location_id(int location_id) { location_id_ = location_id; }
   void set_location_password(const std::string &pwd) { location_password_ = pwd; }
   void set_device_name(const std::string &name) { device_name_ = name; }
+
+  // brakujące metody wymagane przez wygenerowany main.cpp
+  void set_temperature_sensor(esphome::sensor::Sensor *s) { temperature_sensor_ = s; }
+  void set_switch_light(esphome::light::LightState *l) { switch_light_ = l; }
 
   // Component lifecycle
   void setup() override;
@@ -44,7 +49,11 @@ class SuplaEsphomeBridge : public esphome::Component {
   bool registered_{false};
   WiFiClient client_;
 
-  // sproto context
+  // wskaźniki do komponentów ESPHome (opcjonalne, ustawiane przez settery)
+  esphome::sensor::Sensor *temperature_sensor_{nullptr};
+  esphome::light::LightState *switch_light_{nullptr};
+
+  // sproto/srpc context
   void *sproto_ctx_{nullptr};
 
   // stały GUID (binarnie) - 1C81FE5A-DDDD-BCD1-FCC1-0F42C159618E
