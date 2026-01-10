@@ -3,24 +3,25 @@
 #include "esphome.h"
 #include <WiFiClient.h>
 #include <cstring>
+#include <cstdint>
 #include "proto.h"
-#include "srpc.h"
 
 namespace supla_esphome_bridge {
 
-class SuplaEsphomeBridge : public Component {
+class SuplaEsphomeBridge : public esphome::Component {
  public:
   SuplaEsphomeBridge();
   ~SuplaEsphomeBridge() override;
-
-  void setup() override;
-  void loop() override;
 
   // ESPHome setters (zgodne z __init__.py)
   void set_server(const std::string &server) { server_ = server; }
   void set_location_id(int location_id) { location_id_ = location_id; }
   void set_location_password(const std::string &pwd) { location_password_ = pwd; }
   void set_device_name(const std::string &name) { device_name_ = name; }
+
+  // Component lifecycle
+  void setup() override;
+  void loop() override;
 
   // ręczna próba rejestracji (można wywołać z loop lub setup)
   bool register_device(unsigned long timeout_ms = 10000);
@@ -40,9 +41,8 @@ class SuplaEsphomeBridge : public Component {
   std::string device_name_{"esphome-supla"};
   bool registered_{false};
   WiFiClient client_;
-  void *sproto_ctx_{nullptr};
 
-  // stały GUID (binarnie)
+  // stały GUID (binarnie) - 1C81FE5A-DDDD-BCD1-FCC1-0F42C159618E
   static const uint8_t GUID_BIN[16];
 };
 
