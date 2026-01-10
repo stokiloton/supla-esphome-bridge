@@ -37,10 +37,10 @@ void SuplaEsphomeBridge::setup() {
 
 void SuplaEsphomeBridge::loop() {
   static unsigned long last_try = 0;
-  if (!registered_ && millis() - last_try > 100000) {
+  if (!registered_ && millis() - last_try > 10000) {
     last_try = millis();
-    // zwiększony timeout rejestracji do 10s
-    register_device(10000);
+    // zwiększony timeout rejestracji do 30s
+    register_device(30000);
   }
 }
 
@@ -79,7 +79,6 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 #ifdef SUPLA_DS_CALL_REGISTER_DEVICE_G
   const unsigned call_id = SUPLA_DS_CALL_REGISTER_DEVICE_G;
 #else
-  // Jeśli makro nie istnieje, użyj wartości 76 bezpośrednio
   const unsigned call_id = 76;
 #endif
 
@@ -109,8 +108,44 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
     strncpy(reg.SoftVer, softver, SUPLA_SOFTVER_MAXSIZE - 1);
     reg.SoftVer[SUPLA_SOFTVER_MAXSIZE - 1] = 0;
   }
-  // domyślnie brak kanałów
-  reg.channel_count = 0;
+
+  // --- Dodajemy minimalny 1 kanał ---
+  reg.channel_count = 1;
+
+  // Wyzeruj pierwszy kanał
+  memset(&reg.channels[0], 0, sizeof(reg.channels[0]));
+
+  // Ustaw minimalne, typowe pola kanału.
+  // Jeśli Twoja wersja proto.h używa innych nazw pól, dopasuj je odpowiednio.
+  // Najczęściej spotykane pola: Number, Type, Func, Caption
+  reg.channels[0].Number = 0;  // numer kanału
+  reg.channels[0].Type = SUPLA_CHANNELTYPE_THERMOMETER;  // typ: termometr
+  reg.channels[0].Func = SUPLA_CHANNELFNC_THERMOMETER;   // funkcja: termometr
+
+  // Caption / opis kanału (jeśli pole istnieje)
+  const char *ch_caption = "Temp";
+  // Niektóre implementacje mają pole Caption lub CaptionUTF8; próbujemy bezpiecznie skopiować
+#if defined(SUPLA_CHANNEL_CAPTION_MAXSIZE)
+  size_t chcap = (SUPLA_CHANNEL_CAPTION_MAXSIZE > 0) ? (SUPLA_CHANNEL_CAPTION_MAXSIZE - 1) : 0;
+  if (chcap && sizeof(reg.channels[0].Caption) >= chcap + 1) {
+    strncpy(reg.channels[0].Caption, ch_caption, chcap);
+    reg.channels[0].Caption[chcap] = 0;
+  } else {
+    // Fallback: jeśli pole Caption istnieje i jest mniejsze, kopiujemy tyle ile się zmieści
+    if (sizeof(reg.channels[0].Caption) > 0) {
+      size_t cc = sizeof(reg.channels[0].Caption) - 1;
+      strncpy(reg.channels[0].Caption, ch_caption, cc);
+      reg.channels[0].Caption[cc] = 0;
+    }
+  }
+#else
+  // Jeśli nie ma makra, spróbuj bezpiecznie skopiować do pola Caption jeśli istnieje
+  if (sizeof(reg.channels[0].Caption) > 0) {
+    size_t cc = sizeof(reg.channels[0].Caption) - 1;
+    strncpy(reg.channels[0].Caption, ch_caption, cc);
+    reg.channels[0].Caption[cc] = 0;
+  }
+#endif
 
   // Oblicz rzeczywisty rozmiar payloadu: offset do channels + channel_count * sizeof(channel)
   size_t payload_size = offsetof(TDS_SuplaRegisterDevice, channels);
@@ -163,9 +198,12 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
     client_.stop();
     return false;
   }
+  // Ustaw no-delay i wyślij
+  client_.setNoDelay(true);
   ESP_LOGI("supla", "Sending register SDP (call_id=%u), bytes=%u", call_id, (unsigned)outlen);
   hex_dump((const uint8_t*)outbuf, outlen, "TX");
   size_t sent = client_.write((const uint8_t*)outbuf, outlen);
+  client_.flush();
   sproto_sdp_free(sdp);
   if (sent != outlen) {
     ESP_LOGW("supla", "Sent bytes mismatch: sent=%u expected=%u", (unsigned)sent, (unsigned)outlen);
@@ -175,9 +213,11 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 #else
   unsigned _supla_int_t data_size = sdp->data_size;
   size_t packet_len = sizeof(TSuplaDataPacket) - SUPLA_MAX_DATA_SIZE + data_size;
+  client_.setNoDelay(true);
   ESP_LOGI("supla", "Sending raw TSuplaDataPacket (call_id=%u), len=%u", call_id, (unsigned)packet_len);
   hex_dump((const uint8_t*)sdp, packet_len, "TX");
   size_t sent = client_.write((const uint8_t*)sdp, packet_len);
+  client_.flush();
   sproto_sdp_free(sdp);
   if (sent != packet_len) {
     ESP_LOGW("supla", "Sent bytes mismatch: sent=%u expected=%u", (unsigned)sent, (unsigned)packet_len);
