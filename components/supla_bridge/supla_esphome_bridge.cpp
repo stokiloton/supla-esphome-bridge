@@ -1,6 +1,7 @@
 #include "supla_esphome_bridge.h"
-#include <cstddef>  // offsetof
-#include <cstring>
+#include <cstddef>   // offsetof
+#include <cstring>   // memset, strncpy
+#include <cstdint>
 
 namespace supla_esphome_bridge {
 
@@ -15,9 +16,9 @@ SuplaEsphomeBridge::SuplaEsphomeBridge() {
   if (sproto_ctx_) {
 #ifdef SUPLA_PROTO_VERSION
     sproto_set_version(sproto_ctx_, SUPLA_PROTO_VERSION);
-    ESP_LOGI("supla", "sproto initialized, forced proto version=%u", (unsigned)sproto_get_version(sproto_ctx_));
+    ESP_LOGI("supla", "sproto initialized, forced proto version=%u", (unsigned)SUPLA_PROTO_VERSION);
 #else
-    ESP_LOGI("supla", "sproto initialized (no SUPLA_PROTO_VERSION macro found)");
+    ESP_LOGI("supla", "sproto initialized");
 #endif
   } else {
     ESP_LOGW("supla", "sproto_init failed or not available");
@@ -37,7 +38,7 @@ void SuplaEsphomeBridge::setup() {
 
 void SuplaEsphomeBridge::loop() {
   static unsigned long last_try = 0;
-  if (!registered_ && millis() - last_try > 30000) {
+  if (!registered_ && millis() - last_try > 20000) {
     last_try = millis();
     register_device(10000);
   }
@@ -80,11 +81,12 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   const unsigned call_id = 76;
 #endif
 
-  ESP_LOGI("supla", "Attempting register with call_id=%u (only G)", call_id);
+  ESP_LOGI("supla", "Attempting register with call_id=%u (G)", call_id);
 
-  // Przygotuj strukturę rejestracyjną
+  // Prepare registration structure
   TDS_SuplaRegisterDevice reg;
   memset(&reg, 0, sizeof(reg));
+
   reg.LocationID = (_supla_int_t)location_id_;
   if (!location_password_.empty()) {
     size_t maxcpy = (SUPLA_LOCATION_PWD_MAXSIZE > 0) ? SUPLA_LOCATION_PWD_MAXSIZE - 1 : 0;
@@ -93,7 +95,9 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
       reg.LocationPWD[maxcpy] = 0;
     }
   }
+
   memcpy(reg.GUID, GUID_BIN, SUPLA_GUID_SIZE);
+
   if (!device_name_.empty()) {
     size_t maxcpy = (SUPLA_DEVICE_NAME_MAXSIZE > 0) ? SUPLA_DEVICE_NAME_MAXSIZE - 1 : 0;
     if (maxcpy) {
@@ -101,52 +105,47 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
       reg.Name[maxcpy] = 0;
     }
   }
+
   const char *softver = "esphome-supla-bridge-1.0";
   if (SUPLA_SOFTVER_MAXSIZE > 0) {
     strncpy(reg.SoftVer, softver, SUPLA_SOFTVER_MAXSIZE - 1);
     reg.SoftVer[SUPLA_SOFTVER_MAXSIZE - 1] = 0;
   }
 
-  // --- Dodajemy minimalny 1 kanał zgodny z TDS_SuplaDeviceChannel_E ---
+  // --- Add one minimal channel (TDS_SuplaDeviceChannel_E layout) ---
   reg.channel_count = 1;
   memset(&reg.channels[0], 0, sizeof(reg.channels[0]));
 
-  // Pola zgodne z TDS_SuplaDeviceChannel_E
+  // Fields present in TDS_SuplaDeviceChannel_E
   reg.channels[0].Number = 0;
   reg.channels[0].Type = SUPLA_CHANNELTYPE_THERMOMETER;
 
-  // Ustawiamy FuncList na typową wartość dla termometru (bit THERMOMETER)
-  // SUPLA_BIT_FUNC_THERMOMETER z proto.h = 0x00000100
 #ifdef SUPLA_BIT_FUNC_THERMOMETER
-  reg.channels[0].FuncList = ( _supla_int_t ) SUPLA_BIT_FUNC_THERMOMETER;
+  reg.channels[0].FuncList = (_supla_int_t)SUPLA_BIT_FUNC_THERMOMETER;
 #else
-  reg.channels[0].FuncList = 0x00000100;
+  reg.channels[0].FuncList = (_supla_int_t)0x00000100;
 #endif
 
-  // Default, Flags, Offline, ValueValidityTimeSec
   reg.channels[0].Default = 0;
   reg.channels[0].Flags = 0;
   reg.channels[0].Offline = 0;
   reg.channels[0].ValueValidityTimeSec = 0;
-
-  // Wyczyść wartość (value[SUPLA_CHANNELVALUE_SIZE])
   memset(reg.channels[0].value, 0, SUPLA_CHANNELVALUE_SIZE);
-
-  // DefaultIcon i SubDeviceId
   reg.channels[0].DefaultIcon = 0;
   reg.channels[0].SubDeviceId = 0;
 
-  // Oblicz rzeczywisty rozmiar payloadu: offset do channels + channel_count * sizeof(channel)
+  // Compute actual payload size: header up to channels + channel_count * sizeof(channel)
   size_t payload_size = offsetof(TDS_SuplaRegisterDevice, channels);
   unsigned cc = (unsigned)reg.channel_count;
   if (cc > SUPLA_CHANNELMAXCOUNT) cc = SUPLA_CHANNELMAXCOUNT;
   payload_size += cc * sizeof(TDS_SuplaDeviceChannel);
   unsigned _supla_int_t datasz = (unsigned _supla_int_t)payload_size;
 
-  ESP_LOGI("supla", "Prepared register payload_size=%u (channel_count=%u) for call_id=%u", (unsigned)payload_size, (unsigned)reg.channel_count, call_id);
+  ESP_LOGI("supla", "Prepared register payload_size=%u (channel_count=%u) for call_id=%u",
+           (unsigned)payload_size, (unsigned)reg.channel_count, call_id);
   hex_dump((const uint8_t*)&reg, payload_size, "REG-PAYLOAD");
 
-  // Alokuj SDP
+  // Allocate SDP
   TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
   if (!sdp) {
     ESP_LOGW("supla", "sproto_sdp_malloc returned NULL");
@@ -155,7 +154,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   }
   sproto_sdp_init(sproto_ctx_, sdp);
 
-  // Spróbuj ustawić dane w SDP przez helper (call_id = G)
+  // Try to set data via helper
   bool set_ok = sproto_set_data(sdp, (char*)&reg, datasz, call_id);
   if (!set_ok) {
     ESP_LOGW("supla", "sproto_set_data returned false for call_id=%u. Trying fallback...", call_id);
@@ -168,7 +167,8 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
       memcpy(sdp->data, &reg, datasz);
       sdp->data_size = datasz;
       sdp->call_id = call_id;
-      ESP_LOGI("supla", "Fallback: copied payload into sdp->data (data_size=%u) call_id=%u", (unsigned)sdp->data_size, call_id);
+      ESP_LOGI("supla", "Fallback: copied payload into sdp->data (data_size=%u) call_id=%u",
+               (unsigned)sdp->data_size, call_id);
     } else {
       ESP_LOGW("supla", "Fallback failed: sdp->data NULL or max_data (%u) < datasz (%u)", max_data, (unsigned)datasz);
       sproto_sdp_free(sdp);
@@ -216,19 +216,12 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 
   ESP_LOGI("supla", "Register SDP sent (call_id=%u)", call_id);
 
-  // Czekaj na odpowiedź
+  // Wait for response
   bool resp = read_register_response(client_, timeout_ms);
   client_.stop();
   return resp;
 }
 
-/*
-  read_register_response:
-  - zbiera dane z TCP
-  - przekazuje je do sproto input buffer (sproto_in_buffer_append)
-  - wyciąga SDP (sproto_pop_in_sdp) i sprawdza call_id
-  - jeśli otrzymamy SUPLA_SD_CALL_REGISTER_DEVICE_RESULT (lub B), parsujemy TSD_SuplaRegisterDeviceResult
-*/
 bool SuplaEsphomeBridge::read_register_response(WiFiClient &client, unsigned long timeout_ms) {
   if (!sproto_ctx_) {
     ESP_LOGW("supla", "sproto context not initialized");
