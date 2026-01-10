@@ -1,4 +1,4 @@
-#include "supla_esphome_bridge.h"
+i#include "supla_esphome_bridge.h"
 #include <cstddef>
 #include <cstring>
 #include <cstdint>
@@ -43,9 +43,9 @@ void SuplaEsphomeBridge::setup() {
 
 void SuplaEsphomeBridge::loop() {
   static unsigned long last_try = 0;
-  if (!registered_ && millis() - last_try > 10000) {
+  if (!registered_ && millis() - last_try > 20000) {
     last_try = millis();
-    register_device(30000);
+    register_device(10000);
   }
 }
 
