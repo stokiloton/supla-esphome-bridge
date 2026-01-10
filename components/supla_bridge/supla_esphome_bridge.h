@@ -21,21 +21,7 @@
 #include <cstdint>
 #include <cstring>
 
-#include "supla_suml.h"
 #include "proto.h"
-
-// --- Konfiguracja SSL ---
-// Jeśli chcesz akceptować dowolny certyfikat (insecure), odkomentuj poniższą linię.
-// Uwaga: to wyłącza weryfikację TLS i jest niezalecane w produkcji.
-#define USE_SSL_INSECURE
-
-// Jeśli chcesz weryfikować serwer przez root CA, wklej PEM poniżej (zachowaj format PEM).
-// Przykład:
-// static const char SUPLA_ROOT_CA_PEM[] PROGMEM = "-----BEGIN CERTIFICATE-----\nMIID...==\n-----END CERTIFICATE-----\n";
-#ifndef SUPLA_ROOT_CA_PEM
-  // domyślnie pusty; możesz wkleić tu certyfikat CA
-  #define SUPLA_ROOT_CA_PEM nullptr
-#endif
 
 namespace esphome {
 namespace supla_esphome_bridge {
@@ -65,56 +51,8 @@ class SuplaEsphomeBridge : public Component {
   uint8_t location_password_[16]{};
   std::string device_name_{"esphome"};
 
-  SuplaGuid guid_{};
-
-  // Używamy klienta TLS
   SecureClient client_;
-  bool registered_{false};
-
-  sensor::Sensor *temp_sensor_{nullptr};
-  light::LightState *switch_light_{nullptr};
-
-  // Metody pomocnicze
-  void generate_guid_();
-  bool connect_and_register_();  // inicjuje połączenie i wysyła register (nieblokująco)
-  bool send_register_();
-
-  void send_value_temp_();
-  void send_value_relay_();
-  void send_ping_();
-  void handle_incoming_();
-  void send_packet_(const uint8_t *payload, uint16_t size);
-
- private:
-  // State machine i timery
-  enum class BridgeState : uint8_t {
-    DISCONNECTED,
-    CONNECTING,
-    REGISTERING,
-    RUNNING
-  };
-
-  BridgeState state_{BridgeState::DISCONNECTED};
-
-  uint32_t connect_start_ms_{0};
-  uint32_t register_start_ms_{0};
-  uint32_t last_send_{0};
-  uint32_t last_ping_{0};
-  uint32_t last_reconnect_attempt_{0};
-
-  // Nieblokujący parser przychodzących pakietów
-  SuplaPacketHeader pending_header_{};
-  bool pending_header_valid_{false};
-  uint16_t pending_payload_size_{0};
-  static constexpr size_t PENDING_PAYLOAD_MAX = 1024;
-  uint8_t pending_payload_[PENDING_PAYLOAD_MAX]{};
-
-  // Pomocnicze metody
-  void start_connect_();
-  void process_payload_(uint16_t type, const uint8_t *buf, uint16_t size);
-
-  // SSL init helper
-  void init_tls_client_();
+  
 };
 }  // namespace supla_esphome_bridge
 }  // namespace esphome
