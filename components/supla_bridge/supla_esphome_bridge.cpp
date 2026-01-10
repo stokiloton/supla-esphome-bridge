@@ -100,33 +100,37 @@ bool SuplaEsphomeBridge::send_register_packet(WiFiClient &client) {
     return false;
   }
 
-  // Przygotuj strukturę rejestracyjną (TDS_SuplaRegisterDevice)
+  // Przygotuj strukturę rejestracyjną
   TDS_SuplaRegisterDevice reg;
   memset(&reg, 0, sizeof(reg));
   reg.LocationID = (_supla_int_t)location_id_;
+
   if (!location_password_.empty()) {
-    size_t maxcpy = SUPLA_LOCATION_PWD_MAXSIZE > 0 ? SUPLA_LOCATION_PWD_MAXSIZE - 1 : 0;
+    size_t maxcpy = (SUPLA_LOCATION_PWD_MAXSIZE > 0) ? SUPLA_LOCATION_PWD_MAXSIZE - 1 : 0;
     if (maxcpy) {
       strncpy(reg.LocationPWD, location_password_.c_str(), maxcpy);
       reg.LocationPWD[maxcpy] = 0;
     }
   }
+
   memcpy(reg.GUID, GUID_BIN, SUPLA_GUID_SIZE);
+
   if (!device_name_.empty()) {
-    size_t maxcpy = SUPLA_DEVICE_NAME_MAXSIZE > 0 ? SUPLA_DEVICE_NAME_MAXSIZE - 1 : 0;
+    size_t maxcpy = (SUPLA_DEVICE_NAME_MAXSIZE > 0) ? SUPLA_DEVICE_NAME_MAXSIZE - 1 : 0;
     if (maxcpy) {
       strncpy(reg.Name, device_name_.c_str(), maxcpy);
       reg.Name[maxcpy] = 0;
     }
   }
+
   const char *softver = "esphome-supla-bridge-1.0";
   if (SUPLA_SOFTVER_MAXSIZE > 0) {
     strncpy(reg.SoftVer, softver, SUPLA_SOFTVER_MAXSIZE - 1);
     reg.SoftVer[SUPLA_SOFTVER_MAXSIZE - 1] = 0;
   }
+
   reg.channel_count = 0;
 
-  // Hex-dump struktury przed opakowaniem
   ESP_LOGI("supla", "Prepared register struct, size=%u", (unsigned)sizeof(reg));
   hex_dump((const uint8_t*)&reg, sizeof(reg), "REG");
 
@@ -136,41 +140,46 @@ bool SuplaEsphomeBridge::send_register_packet(WiFiClient &client) {
     ESP_LOGW("supla", "sproto_sdp_malloc returned NULL");
     return false;
   }
-  // Zainicjalizuj SDP (jeśli funkcja istnieje)
   sproto_sdp_init(sproto_ctx_, sdp);
 
-  // DEBUG: pokaż pola SDP przed sproto_set_data (jeśli dostępne)
-  ESP_LOGD("supla", "SDP allocated: call_id=%u data_size=%u (before set)", (unsigned)sdp->call_id, (unsigned)sdp->data_size);
-
-  // Spróbuj ustawić dane w SDP. Upewnij się, że rzutujesz rozmiar do typu oczekiwanego przez sproto_set_data.
+  // Spróbuj ustawić dane w SDP przez helper
   unsigned _supla_int_t datasz = (unsigned _supla_int_t)sizeof(reg);
   bool set_ok = sproto_set_data(sdp, (char*)&reg, datasz, SUPLA_DS_CALL_REGISTER_DEVICE_C);
   if (!set_ok) {
-    ESP_LOGW("supla", "sproto_set_data returned false. Trying diagnostics...");
+    ESP_LOGW("supla", "sproto_set_data returned false. Trying fallback...");
 
-    // DIAGNOSTYKA: sprawdź czy makra są zdefiniowane i czy call_id wygląda sensownie
 #ifdef SUPLA_DS_CALL_REGISTER_DEVICE_C
-    ESP_LOGI("supla", "Macro SUPLA_DS_CALL_REGISTER_DEVICE_C defined = %u", (unsigned)SUPLA_DS_CALL_REGISTER_DEVICE_C);
+    ESP_LOGI("supla", "Macro SUPLA_DS_CALL_REGISTER_DEVICE_C = %u", (unsigned)SUPLA_DS_CALL_REGISTER_DEVICE_C);
 #else
     ESP_LOGW("supla", "Macro SUPLA_DS_CALL_REGISTER_DEVICE_C not defined");
 #endif
 
-    // DIAGNOSTYKA: spróbuj ustawić dane bez call_id (jeśli sproto_set_data ma inną sygnaturę)
-    // Niektóre implementacje mają sproto_set_data(sdp, data, size) lub inny porządek parametrów.
-    // Spróbujemy alternatywnie ustawić pola ręcznie (fallback).
-    // Fallback: wypełnij sdp->data i sdp->data_size jeśli struktura TSuplaDataPacket to umożliwia.
-    if (sdp->data && sdp->max_data_size >= datasz) {
+    // Fallback: skopiuj bezpośrednio do sdp->data jeśli jest miejsce
+#ifdef SUPLA_MAX_DATA_SIZE
+    const unsigned max_data = SUPLA_MAX_DATA_SIZE;
+#else
+    const unsigned max_data = 2048; // bezpieczne założenie gdy makro nie istnieje
+#endif
+
+    if (sdp->data && max_data >= datasz) {
       memcpy(sdp->data, &reg, datasz);
       sdp->data_size = datasz;
       sdp->call_id = SUPLA_DS_CALL_REGISTER_DEVICE_C;
-      ESP_LOGI("supla", "Fallback: copied data directly into sdp->data (data_size=%u)", (unsigned)sdp->data_size);
+      ESP_LOGI("supla", "Fallback: copied data into sdp->data (data_size=%u)", (unsigned)sdp->data_size);
     } else {
-      ESP_LOGW("supla", "Fallback failed: sdp->data NULL or too small (max_data_size=%u datasz=%u)",
-               (unsigned)sdp->max_data_size, (unsigned)datasz);
+      ESP_LOGW("supla", "Fallback failed: sdp->data NULL or max_data (%u) < datasz (%u)", max_data, (unsigned)datasz);
       sproto_sdp_free(sdp);
       return false;
     }
   }
+
+  // Pobierz out buffer i wyślij (jeśli dostępny)
+#ifndef SPROTO_WITHOUT_OUT_BUFFER
+  const size_t OUTBUF_SZ = 4096;
+  char outbuf[OUTBUF_SZ];
+  unsigned _supla_int_t outlen = sproto_pop_out_data(sproto_ctx_, outbuf, OUTBUF_SZ);
+  if (outlen == 0) {
+    ESP_LOGW("supla", "sproto
 
   // Jeśli doszliśmy tu, spróbuj pobrać outbuf (jeśli dostępny)
 #ifndef SPROTO_WITHOUT_OUT_BUFFER
