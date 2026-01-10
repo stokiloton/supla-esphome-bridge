@@ -1,4 +1,5 @@
 #include "supla_esphome_bridge.h"
+#include <cstddef>  // offsetof
 
 namespace supla_esphome_bridge {
 
@@ -9,7 +10,6 @@ const uint8_t SuplaEsphomeBridge::GUID_BIN[SUPLA_GUID_SIZE] = {
 };
 
 SuplaEsphomeBridge::SuplaEsphomeBridge() {
-  // Inicjalizacja sproto/srpc (jeśli dostępne)
   sproto_ctx_ = sproto_init();
   if (sproto_ctx_) {
 #ifdef SUPLA_PROTO_VERSION
@@ -85,6 +85,8 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 
 /*
   Budujemy TDS_SuplaRegisterDevice i opakowujemy go w SDP przy użyciu sproto helperów.
+  Ważne: wysyłamy tylko rzeczywisty payload (header + channel_count * sizeof(channel)),
+  nie pełny rozmiar struktury z maksymalną tablicą channels[].
 */
 bool SuplaEsphomeBridge::send_register_packet(WiFiClient &client) {
   if (!sproto_ctx_) {
@@ -121,10 +123,20 @@ bool SuplaEsphomeBridge::send_register_packet(WiFiClient &client) {
     reg.SoftVer[SUPLA_SOFTVER_MAXSIZE - 1] = 0;
   }
 
+  // Jeśli nie dodajemy kanałów, ustaw channel_count = 0
   reg.channel_count = 0;
 
-  ESP_LOGI("supla", "Prepared register struct, size=%u", (unsigned)sizeof(reg));
-  hex_dump((const uint8_t*)&reg, sizeof(reg), "REG");
+  // Oblicz rzeczywisty rozmiar payloadu: offset do channels + channel_count * sizeof(channel)
+  size_t payload_size = offsetof(TDS_SuplaRegisterDevice, channels);
+  unsigned cc = (unsigned)reg.channel_count;
+  if (cc > SUPLA_CHANNELMAXCOUNT) cc = SUPLA_CHANNELMAXCOUNT;
+  payload_size += cc * sizeof(TDS_SuplaDeviceChannel);
+
+  // Bezpieczny rzut do typu oczekiwanego przez sproto
+  unsigned _supla_int_t datasz = (unsigned _supla_int_t)payload_size;
+
+  ESP_LOGI("supla", "Prepared register payload_size=%u (channel_count=%u)", (unsigned)payload_size, (unsigned)reg.channel_count);
+  hex_dump((const uint8_t*)&reg, payload_size, "REG-PAYLOAD");
 
   // Alokuj SDP
   TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
@@ -135,7 +147,6 @@ bool SuplaEsphomeBridge::send_register_packet(WiFiClient &client) {
   sproto_sdp_init(sproto_ctx_, sdp);
 
   // Spróbuj ustawić dane w SDP przez helper
-  unsigned _supla_int_t datasz = (unsigned _supla_int_t)sizeof(reg);
   bool set_ok = sproto_set_data(sdp, (char*)&reg, datasz, SUPLA_DS_CALL_REGISTER_DEVICE_C);
   if (!set_ok) {
     ESP_LOGW("supla", "sproto_set_data returned false. Trying fallback...");
@@ -146,7 +157,6 @@ bool SuplaEsphomeBridge::send_register_packet(WiFiClient &client) {
     ESP_LOGW("supla", "Macro SUPLA_DS_CALL_REGISTER_DEVICE_C not defined");
 #endif
 
-    // Fallback: skopiuj bezpośrednio do sdp->data jeśli jest miejsce
 #ifdef SUPLA_MAX_DATA_SIZE
     const unsigned max_data = SUPLA_MAX_DATA_SIZE;
 #else
@@ -157,7 +167,7 @@ bool SuplaEsphomeBridge::send_register_packet(WiFiClient &client) {
       memcpy(sdp->data, &reg, datasz);
       sdp->data_size = datasz;
       sdp->call_id = SUPLA_DS_CALL_REGISTER_DEVICE_C;
-      ESP_LOGI("supla", "Fallback: copied data into sdp->data (data_size=%u)", (unsigned)sdp->data_size);
+      ESP_LOGI("supla", "Fallback: copied payload into sdp->data (data_size=%u)", (unsigned)sdp->data_size);
     } else {
       ESP_LOGW("supla", "Fallback failed: sdp->data NULL or max_data (%u) < datasz (%u)", max_data, (unsigned)datasz);
       sproto_sdp_free(sdp);
