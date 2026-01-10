@@ -165,7 +165,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   }
   ESP_LOGI("supla", "Sending register SDP (call_id=%u), bytes=%u", call_id, (unsigned)outlen);
   hex_dump((const uint8_t*)outbuf, outlen, "TX");
-  size_t sent = client.write((const uint8_t*)outbuf, outlen);
+  size_t sent = client_.write((const uint8_t*)outbuf, outlen);
   sproto_sdp_free(sdp);
   if (sent != outlen) {
     ESP_LOGW("supla", "Sent bytes mismatch: sent=%u expected=%u", (unsigned)sent, (unsigned)outlen);
@@ -177,7 +177,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   size_t packet_len = sizeof(TSuplaDataPacket) - SUPLA_MAX_DATA_SIZE + data_size;
   ESP_LOGI("supla", "Sending raw TSuplaDataPacket (call_id=%u), len=%u", call_id, (unsigned)packet_len);
   hex_dump((const uint8_t*)sdp, packet_len, "TX");
-  size_t sent = client.write((const uint8_t*)sdp, packet_len);
+  size_t sent = client_.write((const uint8_t*)sdp, packet_len);
   sproto_sdp_free(sdp);
   if (sent != packet_len) {
     ESP_LOGW("supla", "Sent bytes mismatch: sent=%u expected=%u", (unsigned)sent, (unsigned)packet_len);
@@ -189,7 +189,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   ESP_LOGI("supla", "Register SDP sent (call_id=%u)", call_id);
 
   // Czekaj na odpowiedź
-  bool resp = read_register_response(client, timeout_ms);
+  bool resp = read_register_response(client_, timeout_ms);
   client_.stop();
   return resp;
 }
