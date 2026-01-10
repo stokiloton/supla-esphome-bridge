@@ -2,8 +2,10 @@
 
 #include "esphome.h"
 #include <WiFiClient.h>
-#include <cstring>
 #include <cstdint>
+#include <cstring>
+#include <string>
+
 #include "proto.h"
 
 namespace supla_esphome_bridge {
@@ -11,7 +13,7 @@ namespace supla_esphome_bridge {
 class SuplaEsphomeBridge : public esphome::Component {
  public:
   SuplaEsphomeBridge();
-  ~SuplaEsphomeBridge() override;
+  ~SuplaEsphomeBridge();
 
   // ESPHome setters (zgodne z __init__.py)
   void set_server(const std::string &server) { server_ = server; }
@@ -41,6 +43,9 @@ class SuplaEsphomeBridge : public esphome::Component {
   std::string device_name_{"esphome-supla"};
   bool registered_{false};
   WiFiClient client_;
+
+  // sproto context
+  void *sproto_ctx_{nullptr};
 
   // stały GUID (binarnie) - 1C81FE5A-DDDD-BCD1-FCC1-0F42C159618E
   static const uint8_t GUID_BIN[16];
