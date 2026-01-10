@@ -7,14 +7,13 @@
 #include <string>
 
 #include "proto.h"
-#include "srpc.h"
 
 namespace supla_esphome_bridge {
 
 class SuplaEsphomeBridge : public esphome::Component {
  public:
   SuplaEsphomeBridge();
-  ~SuplaEsphomeBridge();
+  ~SuplaEsphomeBridge() override;
 
   // ESPHome setters (zgodne z __init__.py)
   void set_server(const std::string &server) { server_ = server; }
@@ -53,11 +52,11 @@ class SuplaEsphomeBridge : public esphome::Component {
   esphome::sensor::Sensor *temperature_sensor_{nullptr};
   esphome::light::LightState *switch_light_{nullptr};
 
-  // sproto/srpc context
+  // sproto context
   void *sproto_ctx_{nullptr};
 
   // stały GUID (binarnie) - 1C81FE5A-DDDD-BCD1-FCC1-0F42C159618E
-  static const uint8_t GUID_BIN[16];
+  static const uint8_t GUID_BIN[SUPLA_GUID_SIZE];
 };
 
 }  // namespace supla_esphome_bridge
