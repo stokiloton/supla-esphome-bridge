@@ -9,7 +9,7 @@ const uint8_t SuplaEsphomeBridge::GUID_BIN[SUPLA_GUID_SIZE] = {
 };
 
 SuplaEsphomeBridge::SuplaEsphomeBridge() {
-  // Inicjalizacja sproto/srpc (funkcja powinna być zadeklarowana w srpc.h)
+  // Inicjalizacja sproto/srpc (jeśli dostępne)
   sproto_ctx_ = sproto_init();
   if (sproto_ctx_) {
 #ifdef SUPLA_PROTO_VERSION
@@ -85,14 +85,6 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 
 /*
   Budujemy TDS_SuplaRegisterDevice i opakowujemy go w SDP przy użyciu sproto helperów.
-  Używamy dokładnie pól z przesłanej definicji:
-    _supla_int_t LocationID;
-    char LocationPWD[SUPLA_LOCATION_PWD_MAXSIZE];
-    char GUID[SUPLA_GUID_SIZE];
-    char Name[SUPLA_DEVICE_NAME_MAXSIZE];
-    char SoftVer[SUPLA_SOFTVER_MAXSIZE];
-    unsigned char channel_count;
-    TDS_SuplaDeviceChannel channels[SUPLA_CHANNELMAXCOUNT];
 */
 bool SuplaEsphomeBridge::send_register_packet(WiFiClient &client) {
   if (!sproto_ctx_) {
@@ -179,14 +171,6 @@ bool SuplaEsphomeBridge::send_register_packet(WiFiClient &client) {
   char outbuf[OUTBUF_SZ];
   unsigned _supla_int_t outlen = sproto_pop_out_data(sproto_ctx_, outbuf, OUTBUF_SZ);
   if (outlen == 0) {
-    ESP_LOGW("supla", "sproto
-
-  // Jeśli doszliśmy tu, spróbuj pobrać outbuf (jeśli dostępny)
-#ifndef SPROTO_WITHOUT_OUT_BUFFER
-  const size_t OUTBUF_SZ = 4096;
-  char outbuf[OUTBUF_SZ];
-  unsigned _supla_int_t outlen = sproto_pop_out_data(sproto_ctx_, outbuf, OUTBUF_SZ);
-  if (outlen == 0) {
     ESP_LOGW("supla", "sproto_pop_out_data returned 0");
     sproto_sdp_free(sdp);
     return false;
@@ -200,7 +184,7 @@ bool SuplaEsphomeBridge::send_register_packet(WiFiClient &client) {
     return false;
   }
 #else
-  // fallback: wyślij surowy TSuplaDataPacket
+  // Fallback: wyślij surowy TSuplaDataPacket
   unsigned _supla_int_t data_size = sdp->data_size;
   size_t packet_len = sizeof(TSuplaDataPacket) - SUPLA_MAX_DATA_SIZE + data_size;
   ESP_LOGI("supla", "Sending raw TSuplaDataPacket, len=%u", (unsigned)packet_len);
@@ -217,11 +201,6 @@ bool SuplaEsphomeBridge::send_register_packet(WiFiClient &client) {
   return true;
 }
 
-
-/*
-  Odbieramy dane, przekazujemy do sproto input buffer i parsujemy SDP.
-  Jeśli otrzymamy SUPLA_SD_CALL_REGISTER_DEVICE_RESULT (lub _B), mapujemy do TSD_SuplaRegisterDeviceResult.
-*/
 bool SuplaEsphomeBridge::read_register_response(WiFiClient &client, unsigned long timeout_ms) {
   if (!sproto_ctx_) {
     ESP_LOGW("supla", "sproto context not initialized");
