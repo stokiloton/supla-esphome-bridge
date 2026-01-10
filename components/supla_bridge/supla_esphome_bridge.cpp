@@ -9,28 +9,20 @@ const uint8_t SuplaEsphomeBridge::GUID_BIN[16] = {
 };
 
 SuplaEsphomeBridge::SuplaEsphomeBridge() {
-  // inicjalizacja sproto/srpc jeśli dostępne w projekcie
-  sproto_ctx_ = sproto_init();
-  if (sproto_ctx_) {
-    sproto_set_version(sproto_ctx_, SUPLA_PROTO_VERSION);
-    ESP_LOGI("supla", "sproto initialized, proto version %d", SUPLA_PROTO_VERSION);
-  } else {
-    ESP_LOGW("supla", "sproto init failed or not available");
-  }
+  // konstruktor
 }
 
 SuplaEsphomeBridge::~SuplaEsphomeBridge() {
-  if (sproto_ctx_) {
-    sproto_free(sproto_ctx_);
-    sproto_ctx_ = nullptr;
-  }
+  // destruktor
 }
 
 void SuplaEsphomeBridge::setup() {
-  // nic szczególnego tutaj; rejestracja może być wywołana w loop lub ręcznie
+  // nic specjalnego tutaj; rejestracja może być wywołana w loop lub ręcznie
+  ESP_LOGI("supla", "SuplaEsphomeBridge setup()");
 }
 
 void SuplaEsphomeBridge::loop() {
+  // jeśli nie zarejestrowane, spróbuj co 10s
   static unsigned long last_try = 0;
   if (!registered_ && millis() - last_try > 10000) {
     last_try = millis();
@@ -63,16 +55,14 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 }
 
 void SuplaEsphomeBridge::hex_dump(const uint8_t *buf, size_t len, const char *prefix) {
-  // Loguj wierszami po 16 bajtów
   const size_t per_line = 16;
   char line[128];
   for (size_t i = 0; i < len; i += per_line) {
     size_t chunk = (i + per_line <= len) ? per_line : (len - i);
     int pos = snprintf(line, sizeof(line), "%s %04X: ", prefix, (unsigned int)i);
-    for (size_t j = 0; j < chunk && pos < (int)sizeof(line) - 3; j++) {
+    for (size_t j = 0; j < chunk && pos < (int)sizeof(line) - 4; j++) {
       pos += snprintf(line + pos, sizeof(line) - pos, "%02X ", buf[i + j]);
     }
-    // dopisz ASCII (czytelność)
     pos += snprintf(line + pos, sizeof(line) - pos, " | ");
     for (size_t j = 0; j < chunk && pos < (int)sizeof(line) - 2; j++) {
       char c = buf[i + j];
@@ -84,81 +74,78 @@ void SuplaEsphomeBridge::hex_dump(const uint8_t *buf, size_t len, const char *pr
 }
 
 bool SuplaEsphomeBridge::send_register_packet(WiFiClient &client) {
-  if (!sproto_ctx_) {
-    ESP_LOGW("supla", "sproto not initialized - cannot build SDP");
-    return false;
+  // Budujemy strukturę rejestracyjną wersji F (typowa nazwa w proto.h: TDS_SuplaRegisterDevice_F)
+  // Używamy sizeof pól, aby nie polegać na makrach.
+  TDS_SuplaRegisterDevice_F reg;
+  memset(&reg, 0, sizeof(reg));
+
+  // Wypełniamy pola, kopiując GUID, nazwę, softver, servername, location id i location pwd.
+  // Używamy rozmiarów pól bezpośrednio z struktury.
+  if (sizeof(reg.GUID) >= 16) {
+    memcpy(reg.GUID, GUID_BIN, 16);
+  } else {
+    // bezpieczne kopiowanie jeśli pole mniejsze (mało prawdopodobne)
+    memcpy(reg.GUID, GUID_BIN, sizeof(reg.GUID));
   }
 
-  // Przygotuj strukturę rejestracyjną (wersja F - minimalna)
-  TSD_SuplaRegisterDevice_F reg_f;
-  memset(&reg_f, 0, sizeof(reg_f));
-
-  // Wypełnij pola zgodnie z proto.h
-  memcpy(reg_f.GUID, GUID_BIN, SUPLA_GUID_SIZE);
-  // MAC nie mamy - ustawiamy na 0
-  memset(reg_f.MAC, 0, SUPLA_MAC_SIZE);
-  reg_f.LocationID = (uint32_t)location_id_;
-  if (!location_password_.empty()) {
-    strncpy((char*)reg_f.LocationPWD, location_password_.c_str(), sizeof(reg_f.LocationPWD) - 1);
+  // MAC: jeśli struktura ma pole MAC, ustawiamy na 0 (brak)
+  if (sizeof(reg.MAC) >= 1) {
+    memset(reg.MAC, 0, sizeof(reg.MAC));
   }
-  strncpy((char*)reg_f.Name, device_name_.c_str(), sizeof(reg_f.Name) - 1);
-  strncpy((char*)reg_f.SoftVer, "esphome-supla-bridge-1.0", sizeof(reg_f.SoftVer) - 1);
-  strncpy((char*)reg_f.ServerName, server_.c_str(), sizeof(reg_f.ServerName) - 1);
 
-  // Zbuduj SDP (Supla Data Packet) przy użyciu srpc/sproto helperów
-  TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
-  if (!sdp) {
-    ESP_LOGW("supla", "sproto_sdp_malloc failed");
-    return false;
-  }
-  sproto_sdp_init(sproto_ctx_, sdp);
+  // LocationID (jeśli pole istnieje)
+  // Niektóre wersje mają LocationID jako uint32_t lub int32_t
+  // Używamy rzutowania, aby dopasować typ.
+  reg.LocationID = (uint32_t)location_id_;
 
-  // ustaw call_id na rejestrację wersji F
-  sproto_set_data(sdp, (char*)&reg_f, sizeof(reg_f), SUPLA_DS_CALL_REGISTER_DEVICE_F);
-
-  // Wyciągnij dane z out buffer (jeśli implementacja sproto w repo ma out buffer)
-  char outbuf[4096];
-  unsigned _supla_int_t outlen = sproto_pop_out_data(sproto_ctx_, outbuf, sizeof(outbuf));
-  if (outlen == 0) {
-    // fallback: spróbuj serializacji bez out buffer (jeśli sdp ma bezpośrednie pole)
-    if (sdp->data && sdp->data_size > 0) {
-      outlen = sdp->data_size;
-      if (outlen > (unsigned)_SUPLA_INT_MAX) {
-        ESP_LOGW("supla", "Out data too large");
-        sproto_sdp_free(sdp);
-        return false;
-      }
-      memcpy(outbuf, sdp->data, outlen);
-    } else {
-      ESP_LOGW("supla", "No out data to send");
-      sproto_sdp_free(sdp);
-      return false;
+  // LocationPWD: kopiujemy null-terminated, zgodnie z rozmiarem pola
+  if (sizeof(reg.LocationPWD) > 0 && !location_password_.empty()) {
+    size_t maxcpy = sizeof(reg.LocationPWD) - 1;
+    if (maxcpy > 0) {
+      strncpy((char*)reg.LocationPWD, location_password_.c_str(), maxcpy);
+      reg.LocationPWD[maxcpy] = 0;
     }
   }
 
-  // Logowanie wysyłanych danych
-  ESP_LOGI("supla", "Sending register packet, bytes=%u, call_id=%d", (unsigned)outlen, sdp->call_id);
-  hex_dump((const uint8_t*)outbuf, outlen, "TX");
+  // Name, SoftVer, ServerName
+  if (sizeof(reg.Name) > 0) {
+    size_t maxcpy = sizeof(reg.Name) - 1;
+    strncpy((char*)reg.Name, device_name_.c_str(), maxcpy);
+    reg.Name[maxcpy] = 0;
+  }
+  if (sizeof(reg.SoftVer) > 0) {
+    const char *sv = "esphome-supla-bridge-1.0";
+    size_t maxcpy = sizeof(reg.SoftVer) - 1;
+    strncpy((char*)reg.SoftVer, sv, maxcpy);
+    reg.SoftVer[maxcpy] = 0;
+  }
+  if (sizeof(reg.ServerName) > 0) {
+    size_t maxcpy = sizeof(reg.ServerName) - 1;
+    strncpy((char*)reg.ServerName, server_.c_str(), maxcpy);
+    reg.ServerName[maxcpy] = 0;
+  }
 
-  // Wyślij
-  size_t sent = client.write((const uint8_t*)outbuf, outlen);
-  sproto_sdp_free(sdp);
+  // Logowanie struktury przed wysłaniem (hex dump)
+  ESP_LOGI("supla", "Sending raw register struct, size=%u", (unsigned)sizeof(reg));
+  hex_dump((const uint8_t*)&reg, sizeof(reg), "TX");
 
-  if (sent != outlen) {
-    ESP_LOGW("supla", "Sent bytes mismatch: sent=%u expected=%u", (unsigned)sent, (unsigned)outlen);
+  // Wysyłamy surową strukturę
+  size_t sent = client.write((const uint8_t*)&reg, sizeof(reg));
+  if (sent != sizeof(reg)) {
+    ESP_LOGW("supla", "Sent bytes mismatch: sent=%u expected=%u", (unsigned)sent, (unsigned)sizeof(reg));
     return false;
   }
 
-  ESP_LOGI("supla", "Register packet sent successfully");
+  ESP_LOGI("supla", "Register struct sent");
   return true;
 }
 
 bool SuplaEsphomeBridge::read_register_response(WiFiClient &client, unsigned long timeout_ms) {
   unsigned long start = millis();
-  // Bufor wejściowy do logowania
-  const size_t BUF_SZ = 2048;
+  const size_t BUF_SZ = 1024;
   uint8_t inbuf[BUF_SZ];
 
+  // Oczekujemy odpowiedzi; serwer SUPLA zwykle zwraca strukturę TSD_SuplaRegisterDeviceResult (lub B variant)
   while (millis() - start < timeout_ms) {
     if (client.available()) {
       size_t avail = client.available();
@@ -169,47 +156,42 @@ bool SuplaEsphomeBridge::read_register_response(WiFiClient &client, unsigned lon
         continue;
       }
 
-      // Loguj surowe dane przychodzące
       ESP_LOGI("supla", "Received %d bytes from SUPLA", r);
       hex_dump(inbuf, r, "RX");
 
-      // Dodaj dane do sproto in buffer i parsuj SDP
-      sproto_in_buffer_append(sproto_ctx_, (char*)inbuf, (unsigned _supla_int_t)r);
+      // Jeśli bufor jest co najmniej tak duży jak struktura wyniku, spróbuj zmapować
+      if (r >= (int)sizeof(TSD_SuplaRegisterDeviceResult)) {
+        TSD_SuplaRegisterDeviceResult res;
+        // kopiujemy tylko tyle ile potrzeba (bez przekroczenia)
+        memcpy(&res, inbuf, sizeof(res));
 
-      TSuplaDataPacket sdp;
-      while (sproto_pop_in_sdp(sproto_ctx_, &sdp)) {
-        ESP_LOGI("supla", "Parsed SDP: call_id=%d data_size=%d", sdp.call_id, sdp.data_size);
-        // Loguj zawartość pola data (jeśli istnieje)
-        if (sdp.data && sdp.data_size > 0) {
-          hex_dump((const uint8_t*)sdp.data, sdp.data_size, "SDP_DATA");
-        }
+        // Loguj pola, które zwykle istnieją: result_code i activity_timeout
+        // Nazwy pól mogą się różnić w Twoim proto.h; jeśli tak, dopasuj.
+#ifdef SUPLA_RESULT_TRUE
+        const int RESULT_TRUE = SUPLA_RESULT_TRUE;
+#else
+        const int RESULT_TRUE = 1;
+#endif
 
-        // Obsługa wyników rejestracji (różne wersje)
-        if (sdp.call_id == SUPLA_SD_CALL_REGISTER_DEVICE_RESULT ||
-            sdp.call_id == SUPLA_SD_CALL_REGISTER_DEVICE_RESULT_B) {
-          if (sdp.data_size >= (int)sizeof(TSD_SuplaRegisterDeviceResult)) {
-            TSD_SuplaRegisterDeviceResult res;
-            memcpy(&res, sdp.data, sizeof(res));
-            ESP_LOGI("supla", "Register result: result_code=%d device_id=%u activity_timeout=%u",
-                     res.result_code, res.DeviceID, res.activity_timeout);
-            if (res.result_code == SUPLA_RESULT_TRUE) {
-              registered_ = true;
-              ESP_LOGI("supla", "Device registered successfully, device id=%u", res.DeviceID);
-              return true;
-            } else {
-              registered_ = false;
-              ESP_LOGW("supla", "Registration failed, code=%d", res.result_code);
-              return false;
-            }
-          } else {
-            ESP_LOGW("supla", "Register result packet too small: %d", sdp.data_size);
-            // kontynuuj parsowanie dalszych SDP
-          }
+        ESP_LOGI("supla", "Register result: result_code=%d activity_timeout=%u",
+                 res.result_code, (unsigned)res.activity_timeout);
+
+        if (res.result_code == RESULT_TRUE) {
+          registered_ = true;
+          ESP_LOGI("supla", "Device registered successfully (activity_timeout=%u)", (unsigned)res.activity_timeout);
+          return true;
         } else {
-          ESP_LOGD("supla", "Unhandled call_id %d", sdp.call_id);
+          registered_ = false;
+          ESP_LOGW("supla", "Registration failed, code=%d", res.result_code);
+          return false;
         }
-      }  // while pop sdp
-    }    // if available
+      } else {
+        // Jeśli otrzymaliśmy mniej niż rozmiar struktury, kontynuujemy zbieranie (prosty tryb)
+        // W prostym podejściu nie buforujemy wieloczęściowych odpowiedzi; można rozbudować.
+        ESP_LOGD("supla", "Received %d bytes, waiting for full result struct (%u bytes needed)",
+                 r, (unsigned)sizeof(TSD_SuplaRegisterDeviceResult));
+      }
+    }  // if available
 
     delay(10);
   }  // while timeout
