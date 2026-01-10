@@ -100,54 +100,79 @@ bool SuplaEsphomeBridge::send_register_packet(WiFiClient &client) {
     return false;
   }
 
+  // Przygotuj strukturę rejestracyjną (TDS_SuplaRegisterDevice)
   TDS_SuplaRegisterDevice reg;
   memset(&reg, 0, sizeof(reg));
-
-  // LocationID
   reg.LocationID = (_supla_int_t)location_id_;
-
-  // LocationPWD (null-terminated)
   if (!location_password_.empty()) {
-    size_t maxcpy = SUPLA_LOCATION_PWD_MAXSIZE - 1;
-    if (maxcpy > 0) {
+    size_t maxcpy = SUPLA_LOCATION_PWD_MAXSIZE > 0 ? SUPLA_LOCATION_PWD_MAXSIZE - 1 : 0;
+    if (maxcpy) {
       strncpy(reg.LocationPWD, location_password_.c_str(), maxcpy);
       reg.LocationPWD[maxcpy] = 0;
     }
   }
-
-  // GUID
   memcpy(reg.GUID, GUID_BIN, SUPLA_GUID_SIZE);
-
-  // Name
   if (!device_name_.empty()) {
-    size_t maxcpy = SUPLA_DEVICE_NAME_MAXSIZE - 1;
-    strncpy(reg.Name, device_name_.c_str(), maxcpy);
-    reg.Name[maxcpy] = 0;
+    size_t maxcpy = SUPLA_DEVICE_NAME_MAXSIZE > 0 ? SUPLA_DEVICE_NAME_MAXSIZE - 1 : 0;
+    if (maxcpy) {
+      strncpy(reg.Name, device_name_.c_str(), maxcpy);
+      reg.Name[maxcpy] = 0;
+    }
   }
-
-  // SoftVer
   const char *softver = "esphome-supla-bridge-1.0";
-  strncpy(reg.SoftVer, softver, SUPLA_SOFTVER_MAXSIZE - 1);
-  reg.SoftVer[SUPLA_SOFTVER_MAXSIZE - 1] = 0;
-
-  // Brak kanałów na razie
+  if (SUPLA_SOFTVER_MAXSIZE > 0) {
+    strncpy(reg.SoftVer, softver, SUPLA_SOFTVER_MAXSIZE - 1);
+    reg.SoftVer[SUPLA_SOFTVER_MAXSIZE - 1] = 0;
+  }
   reg.channel_count = 0;
 
-  // Alokuj SDP przez sproto helper
+  // Hex-dump struktury przed opakowaniem
+  ESP_LOGI("supla", "Prepared register struct, size=%u", (unsigned)sizeof(reg));
+  hex_dump((const uint8_t*)&reg, sizeof(reg), "REG");
+
+  // Alokuj SDP
   TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
   if (!sdp) {
-    ESP_LOGW("supla", "sproto_sdp_malloc failed");
+    ESP_LOGW("supla", "sproto_sdp_malloc returned NULL");
     return false;
   }
+  // Zainicjalizuj SDP (jeśli funkcja istnieje)
   sproto_sdp_init(sproto_ctx_, sdp);
 
-  // Ustaw dane i call_id dla rejestracji. Używamy makra dla wersji C (jeśli serwer oczekuje innej wersji, zmień makro)
-  if (!sproto_set_data(sdp, (char*)&reg, (unsigned _supla_int_t)sizeof(reg), SUPLA_DS_CALL_REGISTER_DEVICE_C)) {
-    ESP_LOGW("supla", "sproto_set_data failed");
-    sproto_sdp_free(sdp);
-    return false;
+  // DEBUG: pokaż pola SDP przed sproto_set_data (jeśli dostępne)
+  ESP_LOGD("supla", "SDP allocated: call_id=%u data_size=%u (before set)", (unsigned)sdp->call_id, (unsigned)sdp->data_size);
+
+  // Spróbuj ustawić dane w SDP. Upewnij się, że rzutujesz rozmiar do typu oczekiwanego przez sproto_set_data.
+  unsigned _supla_int_t datasz = (unsigned _supla_int_t)sizeof(reg);
+  bool set_ok = sproto_set_data(sdp, (char*)&reg, datasz, SUPLA_DS_CALL_REGISTER_DEVICE_C);
+  if (!set_ok) {
+    ESP_LOGW("supla", "sproto_set_data returned false. Trying diagnostics...");
+
+    // DIAGNOSTYKA: sprawdź czy makra są zdefiniowane i czy call_id wygląda sensownie
+#ifdef SUPLA_DS_CALL_REGISTER_DEVICE_C
+    ESP_LOGI("supla", "Macro SUPLA_DS_CALL_REGISTER_DEVICE_C defined = %u", (unsigned)SUPLA_DS_CALL_REGISTER_DEVICE_C);
+#else
+    ESP_LOGW("supla", "Macro SUPLA_DS_CALL_REGISTER_DEVICE_C not defined");
+#endif
+
+    // DIAGNOSTYKA: spróbuj ustawić dane bez call_id (jeśli sproto_set_data ma inną sygnaturę)
+    // Niektóre implementacje mają sproto_set_data(sdp, data, size) lub inny porządek parametrów.
+    // Spróbujemy alternatywnie ustawić pola ręcznie (fallback).
+    // Fallback: wypełnij sdp->data i sdp->data_size jeśli struktura TSuplaDataPacket to umożliwia.
+    if (sdp->data && sdp->max_data_size >= datasz) {
+      memcpy(sdp->data, &reg, datasz);
+      sdp->data_size = datasz;
+      sdp->call_id = SUPLA_DS_CALL_REGISTER_DEVICE_C;
+      ESP_LOGI("supla", "Fallback: copied data directly into sdp->data (data_size=%u)", (unsigned)sdp->data_size);
+    } else {
+      ESP_LOGW("supla", "Fallback failed: sdp->data NULL or too small (max_data_size=%u datasz=%u)",
+               (unsigned)sdp->max_data_size, (unsigned)datasz);
+      sproto_sdp_free(sdp);
+      return false;
+    }
   }
 
+  // Jeśli doszliśmy tu, spróbuj pobrać outbuf (jeśli dostępny)
 #ifndef SPROTO_WITHOUT_OUT_BUFFER
   const size_t OUTBUF_SZ = 4096;
   char outbuf[OUTBUF_SZ];
@@ -157,8 +182,7 @@ bool SuplaEsphomeBridge::send_register_packet(WiFiClient &client) {
     sproto_sdp_free(sdp);
     return false;
   }
-
-  ESP_LOGI("supla", "Sending register SDP, bytes=%u call_id=%u", (unsigned)outlen, (unsigned)sdp->call_id);
+  ESP_LOGI("supla", "sproto_pop_out_data returned %u bytes", (unsigned)outlen);
   hex_dump((const uint8_t*)outbuf, outlen, "TX");
   size_t sent = client.write((const uint8_t*)outbuf, outlen);
   sproto_sdp_free(sdp);
@@ -167,10 +191,10 @@ bool SuplaEsphomeBridge::send_register_packet(WiFiClient &client) {
     return false;
   }
 #else
-  // Fallback: wysyłamy surowy TSuplaDataPacket
+  // fallback: wyślij surowy TSuplaDataPacket
   unsigned _supla_int_t data_size = sdp->data_size;
   size_t packet_len = sizeof(TSuplaDataPacket) - SUPLA_MAX_DATA_SIZE + data_size;
-  ESP_LOGI("supla", "Sending register SDP raw packet, bytes=%u call_id=%u", (unsigned)packet_len, (unsigned)sdp->call_id);
+  ESP_LOGI("supla", "Sending raw TSuplaDataPacket, len=%u", (unsigned)packet_len);
   hex_dump((const uint8_t*)sdp, packet_len, "TX");
   size_t sent = client.write((const uint8_t*)sdp, packet_len);
   sproto_sdp_free(sdp);
@@ -183,6 +207,7 @@ bool SuplaEsphomeBridge::send_register_packet(WiFiClient &client) {
   ESP_LOGI("supla", "Register SDP sent");
   return true;
 }
+
 
 /*
   Odbieramy dane, przekazujemy do sproto input buffer i parsujemy SDP.
