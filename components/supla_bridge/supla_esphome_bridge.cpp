@@ -37,10 +37,10 @@ void SuplaEsphomeBridge::setup() {
 
 void SuplaEsphomeBridge::loop() {
   static unsigned long last_try = 0;
-  if (!registered_ && millis() - last_try > 10000) {
+  if (!registered_ && millis() - last_try > 30000) {
     last_try = millis();
-    // zwiększony timeout rejestracji do 30s
-    register_device(30000);
+    // zwiększony timeout rejestracji do 10s
+    register_device(10000);
   }
 }
 
