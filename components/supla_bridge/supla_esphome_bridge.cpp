@@ -160,7 +160,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
   if (!sdp) {
     ESP_LOGW("supla", "sproto_sdp_malloc failed");
-    client_.stop();
+    //client_.stop();
     return false;
   }
   ESP_LOGW("supla", "sproto_sdp_malloc OK");
