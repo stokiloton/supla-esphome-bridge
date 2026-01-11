@@ -124,61 +124,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   reg.ManufacturerID = SUPLA_MFR_UNKNOWN;
   reg.ProductID = 0;
 
-  // -------------------------
-  // One channel (TDS_SuplaDeviceChannel_E)
-  // -------------------------
-  reg.channel_count = 1;
 
-  TDS_SuplaDeviceChannel_E &ch = reg.channels[0];
-  memset(&ch, 0, sizeof(ch));
-
-  ch.Number = 0;
-  ch.Type = SUPLA_CHANNELTYPE_THERMOMETER;
-  ch.FuncList = SUPLA_BIT_FUNC_THERMOMETER;
-  ch.Default = 0;
-  ch.Flags = 0;
-  ch.Offline = 0;
-  ch.ValueValidityTimeSec = 0;
-  memset(ch.value, 0, SUPLA_CHANNELVALUE_SIZE);
-  ch.DefaultIcon = 0;
-  ch.SubDeviceId = 0;
-
-  // -------------------------
-  // Payload size
-  // -------------------------
-  size_t payload_size =
-      offsetof(TDS_SuplaRegisterDevice_G, channels) +
-      reg.channel_count * sizeof(TDS_SuplaDeviceChannel_E);
-
-  ESP_LOGI("supla", "Prepared REGISTER_DEVICE_G payload_size=%u (channel_count=%u)",
-           (unsigned)payload_size, (unsigned)reg.channel_count);
-  hex_dump((const uint8_t*)&reg, payload_size, "REG-PAYLOAD");
-
-  // -------------------------
-  // Build SDP (RAW MODE)
-  // -------------------------
-  TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
-  if (!sdp) {
-    ESP_LOGW("supla", "sproto_sdp_malloc failed");
-    client_.stop();
-    return false;
-  }
-
-  sproto_sdp_init(sproto_ctx_, sdp);
-
-  if (!sproto_set_data(sdp, (char*)&reg, (unsigned _supla_int_t)payload_size, call_id)) {
-    ESP_LOGW("supla", "sproto_set_data failed");
-    sproto_sdp_free(sdp);
-    client_.stop();
-    return false;
-  }
-
-  size_t packet_len =
-      sizeof(TSuplaDataPacket) - SUPLA_MAX_DATA_SIZE + sdp->data_size;
-
-  ESP_LOGI("supla", "Sending RAW REGISTER_DEVICE_G (call_id=%u), len=%u",
-           call_id, (unsigned)packet_len);
-  hex_dump((uint8_t*)sdp, packet_len, "TX");
 
   bool resp = read_register_response(client_, timeout_ms);
   client_.stop();
