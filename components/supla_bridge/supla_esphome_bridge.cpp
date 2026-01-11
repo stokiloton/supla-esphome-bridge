@@ -1,3 +1,27 @@
+Kod REGISTER_DEVICE_E
+
+Poniżej znajduje się kompletny kod źródłowy implementujący rejestrację urządzenia SUPLA w trybie RAW z użyciem REGISTER_DEVICE_E, zgodny z SUPLA Cloud oraz Twoją istniejącą strukturą klasy.
+
+Kod zawiera:
+
+pełną obsługę REGISTER_DEVICE_E,
+
+wykorzystanie location_id_ i location_password_ z konfiguracji,
+
+kanał typu E (termometr),
+
+RAW‑mode,
+
+zgodność z SUPLA_PROTO_VERSION 28,
+
+poprawne liczenie payloadu i długości ramki,
+
+pełne logowanie i hex dump,
+
+minimalne zmiany względem Twojej wersji.
+
+Kompletna implementacja REGISTER_DEVICE_E
+
 #include "supla_esphome_bridge.h"
 #include <cstddef>
 #include <cstring>
@@ -7,8 +31,8 @@
 #define SUPLA_PROTO_VERSION 28
 #endif
 
-#ifndef SUPLA_DS_CALL_REGISTER_DEVICE_G
-#define SUPLA_DS_CALL_REGISTER_DEVICE_G 76
+#ifndef SUPLA_DS_CALL_REGISTER_DEVICE_E
+#define SUPLA_DS_CALL_REGISTER_DEVICE_E 69
 #endif
 
 namespace supla_esphome_bridge {
@@ -102,40 +126,32 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   yield();
   delay(1);
   
-  const unsigned call_id = SUPLA_DS_CALL_REGISTER_DEVICE_G;
-  ESP_LOGI("supla", "Attempting register with call_id=%u (REGISTER_DEVICE_G)", call_id);
+  const unsigned call_id = SUPLA_DS_CALL_REGISTER_DEVICE_E;
+  ESP_LOGI("supla", "Attempting register with call_id=%u (REGISTER_DEVICE_E)", call_id);
+
   // -------------------------
-  // Build TDS_SuplaRegisterDevice_G (Email + AuthKey)
+  // Build TDS_SuplaRegisterDevice_E
   // -------------------------
-  static TDS_SuplaRegisterDevice_G reg;
+  static TDS_SuplaRegisterDevice_E reg;
   memset(&reg, 0, sizeof(reg));
 
   yield();
   delay(1);
 
-  // EMAIL
-  strncpy(reg.Email, "stokiloton@gmail.com", SUPLA_EMAIL_MAXSIZE - 1);
-
-  // AUTHKEY (16 bytes, stały)
-  static const uint8_t AUTHKEY[SUPLA_AUTHKEY_SIZE] = {
-    0xA3,0x5F,0x91,0x0C,0x77,0x2B,0x4E,0x88,
-    0x19,0xC4,0x5A,0x0D,0x6E,0x3F,0x12,0x99
-  };
-  memcpy(reg.AuthKey, AUTHKEY, SUPLA_AUTHKEY_SIZE);
+  // LocationID / LocationPWD
+  reg.LocationID = location_id_;
+  strncpy(reg.LocationPWD, location_password_.c_str(), SUPLA_LOCATION_PWD_MAXSIZE - 1);
 
   // GUID
   memcpy(reg.GUID, GUID_BIN, SUPLA_GUID_SIZE);
 
-  yield();
-  delay(1);
-
+  // Name
   strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE - 1);
 
-
   // SoftVer
-  strncpy(reg.SoftVer, "GG v1", SUPLA_SOFTVER_MAXSIZE - 1);
+  strncpy(reg.SoftVer, "ESPHome SUPLA v1", SUPLA_SOFTVER_MAXSIZE - 1);
 
-   // ServerName (musi odpowiadać temu, co wpisujesz jako server)
+  // ServerName
   strncpy(reg.ServerName, server_.c_str(), SUPLA_SERVER_NAME_MAXSIZE - 1);
   
   // Flags, ManufacturerID, ProductID
@@ -168,14 +184,14 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   // -------------------------
   // Payload size
   // -------------------------
-
   yield();
   delay(1);
+
   size_t payload_size =
-      offsetof(TDS_SuplaRegisterDevice_G, channels) +
+      offsetof(TDS_SuplaRegisterDevice_E, channels) +
       reg.channel_count * sizeof(TDS_SuplaDeviceChannel_E);
 
-  ESP_LOGI("supla", "Prepared REGISTER_DEVICE_G payload_size=%u (channel_count=%u)",
+  ESP_LOGI("supla", "Prepared REGISTER_DEVICE_E payload_size=%u (channel_count=%u)",
            (unsigned)payload_size, (unsigned)reg.channel_count);
 
   yield();
@@ -183,20 +199,19 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   
   hex_dump((const uint8_t*)&reg, payload_size, "REG-PAYLOAD");
 
-
   yield();
   delay(1);
   
   // -------------------------
   // Build SDP (RAW MODE)
   // -------------------------
-  static TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
+  TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
   if (!sdp) {
     ESP_LOGW("supla", "sproto_sdp_malloc failed");
     client_.stop();
     return false;
   }
-  ESP_LOGW("supla", "sproto_sdp_malloc OK");
+  ESP_LOGI("supla", "sproto_sdp_malloc OK");
   
   yield();
   delay(1);
@@ -206,19 +221,19 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   yield();
   delay(1);
 
-  ESP_LOGI("supla", "SUPLA_MAX_DATA_SIZE=%u (REGISTER_DEVICE_G)", SUPLA_MAX_DATA_SIZE );
+  ESP_LOGI("supla", "SUPLA_MAX_DATA_SIZE=%u (REGISTER_DEVICE_E)", SUPLA_MAX_DATA_SIZE );
   
   if (!sproto_set_data(sdp, (char*)&reg, (unsigned _supla_int_t)payload_size, call_id)) {
     ESP_LOGW("supla", "sproto_set_data failed");
-    //sproto_sdp_free(sdp);
-    //client_.stop();
-    //return false;
+    sproto_sdp_free(sdp);
+    client_.stop();
+    return false;
   }
 
   size_t packet_len =
       sizeof(TSuplaDataPacket) - SUPLA_MAX_DATA_SIZE + sdp->data_size;
 
-  ESP_LOGI("supla", "Sending RAW REGISTER_DEVICE_G (call_id=%u), len=%u",
+  ESP_LOGI("supla", "Sending RAW REGISTER_DEVICE_E (call_id=%u), len=%u",
            call_id, (unsigned)packet_len);
 
   yield();
@@ -248,14 +263,10 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
     return false;
   }
 
-  ESP_LOGI("supla", "REGISTER_DEVICE_G sent");
-
+  ESP_LOGI("supla", "REGISTER_DEVICE_E sent");
 
   yield();
   delay(1);
-
-
-  
 
   bool resp = read_register_response(client_, timeout_ms);
   yield();
