@@ -151,7 +151,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 
   ESP_LOGI("supla", "Prepared REGISTER_DEVICE_G payload_size=%u (channel_count=%u)",
            (unsigned)payload_size, (unsigned)reg.channel_count);
-  //hex_dump((const uint8_t*)&reg, payload_size, "REG-PAYLOAD");
+  hex_dump((const uint8_t*)&reg, payload_size, "REG-PAYLOAD");
 
 
 
