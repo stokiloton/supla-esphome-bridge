@@ -112,7 +112,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   if (!device_name_.empty()) {
     strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE - 1);
   } else {
-    strncpy(reg.Name, "esphomeDe", SUPLA_DEVICE_NAME_MAXSIZE - 1);
+    strncpy(reg.Name, "esphomeDevice", SUPLA_DEVICE_NAME_MAXSIZE - 1);
   }
 
   // SoftVer
@@ -123,7 +123,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 
   // Flags, ManufacturerID, ProductID
   reg.Flags = 0;
-  reg.ManufacturerID = SUPLA_MFR_UNKNOWN;
+  reg.ManufacturerID = 0;
   reg.ProductID = 0;
   
 
