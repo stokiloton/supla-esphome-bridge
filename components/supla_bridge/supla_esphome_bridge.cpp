@@ -86,7 +86,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
     if (client_.connect(server_.c_str(), 2015)) { 
       ok = true; break;
     }
-    delay(10);
+    delay(1);
     yield();
   }
   
@@ -107,7 +107,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   TDS_SuplaRegisterDevice_G reg;
   memset(&reg, 0, sizeof(reg));
 
-    yield();
+  yield();
   delay(1);
 
   // EMAIL
@@ -184,10 +184,10 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   // Build SDP (RAW MODE)
   // -------------------------
   yield();
-  delay(1);
+  delay(10);
   TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
   yield();
-  delay(1);
+  delay(10);
   if (!sdp) {
     ESP_LOGW("supla", "sproto_sdp_malloc failed");
     client_.stop();
@@ -201,6 +201,8 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   
 
   bool resp = read_register_response(client_, timeout_ms);
+  yield();
+  delay(1);
   client_.stop();
   return resp;
 }
