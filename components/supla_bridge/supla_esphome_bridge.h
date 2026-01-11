@@ -9,9 +9,6 @@
 #include "proto.h"
 #include "srpc.h"
 
-#undef SUPLA_MAX_DATA_SIZE
-#define SUPLA_MAX_DATA_SIZE 1536
-
 namespace supla_esphome_bridge {
 
 class SuplaEsphomeBridge : public esphome::Component {
