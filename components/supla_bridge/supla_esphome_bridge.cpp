@@ -11,9 +11,6 @@
 #define SUPLA_DS_CALL_REGISTER_DEVICE_G 76
 #endif
 
-#undef SUPLA_MAX_DATA_SIZE
-#define SUPLA_MAX_DATA_SIZE 1536
-
 namespace supla_esphome_bridge {
 
 // GUID: 1C81FE5A-DDDD-BCD1-FCC1-0F42C159618E
