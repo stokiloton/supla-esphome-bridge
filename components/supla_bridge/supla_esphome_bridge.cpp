@@ -85,6 +85,8 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   }
   ESP_LOGI("supla", "Connected to SUPLA server %s:2015", server_.c_str());
 
+  yield();
+  delay(1);
   
   const unsigned call_id = SUPLA_DS_CALL_REGISTER_DEVICE_G;
   ESP_LOGI("supla", "Attempting register with call_id=%u (REGISTER_DEVICE_G)", call_id);
@@ -121,7 +123,9 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   reg.Flags = 0;
   reg.ManufacturerID = 0;
   reg.ProductID = 0;
-  
+
+  yield();
+  delay(1);
 
   // -------------------------
   // One channel (TDS_SuplaDeviceChannel_E)
@@ -151,6 +155,10 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 
   ESP_LOGI("supla", "Prepared REGISTER_DEVICE_G payload_size=%u (channel_count=%u)",
            (unsigned)payload_size, (unsigned)reg.channel_count);
+
+  yield();
+  delay(1);
+  
   hex_dump((const uint8_t*)&reg, payload_size, "REG-PAYLOAD");
 
 
