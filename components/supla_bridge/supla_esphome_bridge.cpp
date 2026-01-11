@@ -43,7 +43,7 @@ void SuplaEsphomeBridge::setup() {
 
 void SuplaEsphomeBridge::loop() {
   static unsigned long last_try = 0;
-  if (!registered_ && millis() - last_try > 100000) {
+  if (!registered_ && millis() - last_try > 30000) {
     last_try = millis();
     register_device(10000);
   }
