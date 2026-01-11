@@ -232,12 +232,12 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   yield();
   delay(1);
 
-  size_t sent = client_.write((uint8_t*)sdp, packet_len);
+  //size_t sent = client_.write((uint8_t*)sdp, packet_len);
 
   yield();
   delay(1);
   
-  client_.flush();
+  //client_.flush();
 
   yield();
   delay(1);
