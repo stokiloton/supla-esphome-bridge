@@ -75,6 +75,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   }
 
   ESP_LOGI("supla", "Connecting to SUPLA server %s:2015", server_.c_str());
+  client_.setTimeout(3000);
   if (!client_.connect(server_.c_str(), 2015)) {
     ESP_LOGW("supla", "Cannot connect to SUPLA server");
     return false;
@@ -90,7 +91,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   memset(&reg, 0, sizeof(reg));
 
   // EMAIL
-  strncpy(reg.Email, "stokiloton@gmail.com", SUPLA_EMAIL_MAXSIZE - 1);
+  strncpy(reg.Email, "tmp.spam.stokiloton@gmail.com", SUPLA_EMAIL_MAXSIZE - 1);
 
   // AUTHKEY (16 bytes, stały)
   static const uint8_t AUTHKEY[SUPLA_AUTHKEY_SIZE] = {
