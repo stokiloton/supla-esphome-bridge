@@ -229,24 +229,24 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   yield();
   delay(1);
 
-  //size_t sent = client_.write((uint8_t*)sdp, packet_len);
+  size_t sent = client_.write((uint8_t*)sdp, packet_len);
 
   yield();
   delay(1);
   
-  //client_.flush();
+  client_.flush();
 
   yield();
   delay(1);
   
   sproto_sdp_free(sdp);
 
- // if (sent != packet_len) {
- //   ESP_LOGW("supla", "Sent mismatch: %u != %u",
- //           (unsigned)sent, (unsigned)packet_len);
-  //  client_.stop();
-  //  return false;
-  //}
+  if (sent != packet_len) {
+    ESP_LOGW("supla", "Sent mismatch: %u != %u",
+            (unsigned)sent, (unsigned)packet_len);
+    client_.stop();
+    return false;
+  }
 
   ESP_LOGI("supla", "REGISTER_DEVICE_G sent");
 
