@@ -209,11 +209,13 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   yield();
   delay(1);
 
+  ESP_LOGI("supla", "SUPLA_MAX_DATA_SIZE=%u (REGISTER_DEVICE_G)", SUPLA_MAX_DATA_SIZE );
+  
   if (!sproto_set_data(sdp, (char*)&reg, (unsigned _supla_int_t)payload_size, call_id)) {
     ESP_LOGW("supla", "sproto_set_data failed");
-    sproto_sdp_free(sdp);
-    client_.stop();
-    return false;
+    //sproto_sdp_free(sdp);
+    //client_.stop();
+    //return false;
   }
 
   size_t packet_len =
