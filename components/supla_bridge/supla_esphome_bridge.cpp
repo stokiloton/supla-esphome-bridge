@@ -107,13 +107,8 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   memcpy(reg.GUID, GUID_BIN, SUPLA_GUID_SIZE);
 
 
-  
-    // Name (z YAML: device_name_)
-  if (!device_name_.empty()) {
-    strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE - 1);
-  } else {
-    strncpy(reg.Name, "esphomeDevice", SUPLA_DEVICE_NAME_MAXSIZE - 1);
-  }
+  strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE - 1);
+
 
 
 
