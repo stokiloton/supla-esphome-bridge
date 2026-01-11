@@ -43,6 +43,7 @@ void SuplaEsphomeBridge::setup() {
 
 void SuplaEsphomeBridge::loop() {
   static unsigned long last_try = 0;
+  delay(5);
   if (!registered_ && millis() - last_try > 30000) {
     last_try = millis();
     register_device(10000);
@@ -154,15 +155,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 
 
 
- // -------------------------
-  // Build SDP (RAW MODE)
-  // -------------------------
-  TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
-  if (!sdp) {
-    ESP_LOGW("supla", "sproto_sdp_malloc failed");
-    //client_.stop();
-    return false;
-  }
+
   ESP_LOGW("supla", "sproto_sdp_malloc OK");
 
 
