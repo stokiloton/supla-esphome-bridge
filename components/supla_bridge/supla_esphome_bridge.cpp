@@ -141,6 +141,17 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   ch.DefaultIcon = 0;
   ch.SubDeviceId = 0;
 
+  // -------------------------
+  // Payload size
+  // -------------------------
+  size_t payload_size =
+      offsetof(TDS_SuplaRegisterDevice_G, channels) +
+      reg.channel_count * sizeof(TDS_SuplaDeviceChannel_E);
+
+  ESP_LOGI("supla", "Prepared REGISTER_DEVICE_G payload_size=%u (channel_count=%u)",
+           (unsigned)payload_size, (unsigned)reg.channel_count);
+  hex_dump((const uint8_t*)&reg, payload_size, "REG-PAYLOAD");
+
 
   bool resp = read_register_response(client_, timeout_ms);
   client_.stop();
