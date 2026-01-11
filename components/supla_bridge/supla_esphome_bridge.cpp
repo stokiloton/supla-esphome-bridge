@@ -107,6 +107,9 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   TDS_SuplaRegisterDevice_G reg;
   memset(&reg, 0, sizeof(reg));
 
+    yield();
+  delay(1);
+
   // EMAIL
   strncpy(reg.Email, "tmp.spam.stokiloton@gmail.com", SUPLA_EMAIL_MAXSIZE - 1);
 
@@ -120,6 +123,8 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   // GUID
   memcpy(reg.GUID, GUID_BIN, SUPLA_GUID_SIZE);
 
+  yield();
+  delay(1);
 
   strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE - 1);
 
@@ -160,6 +165,9 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   // -------------------------
   // Payload size
   // -------------------------
+
+  yield();
+  delay(1);
   size_t payload_size =
       offsetof(TDS_SuplaRegisterDevice_G, channels) +
       reg.channel_count * sizeof(TDS_SuplaDeviceChannel_E);
@@ -175,7 +183,11 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
  // -------------------------
   // Build SDP (RAW MODE)
   // -------------------------
+  yield();
+  delay(1);
   TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
+  yield();
+  delay(1);
   if (!sdp) {
     ESP_LOGW("supla", "sproto_sdp_malloc failed");
     client_.stop();
