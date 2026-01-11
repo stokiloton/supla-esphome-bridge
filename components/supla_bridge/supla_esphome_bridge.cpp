@@ -178,21 +178,15 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   yield();
   delay(1);
   
-  //hex_dump((const uint8_t*)&reg, payload_size, "REG-PAYLOAD");
+  hex_dump((const uint8_t*)&reg, payload_size, "REG-PAYLOAD");
 
  // -------------------------
   // Build SDP (RAW MODE)
   // -------------------------
   yield();
   delay(10);
-  TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
-  yield();
-  delay(10);
-  if (!sdp) {
-    ESP_LOGW("supla", "sproto_sdp_malloc failed");
-    client_.stop();
-    return false;
-  }
+  //TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
+
   ESP_LOGW("supla", "sproto_sdp_malloc OK");
   yield();
   delay(1);
