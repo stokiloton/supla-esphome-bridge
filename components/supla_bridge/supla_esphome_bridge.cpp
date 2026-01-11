@@ -86,7 +86,8 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   bool ok = false;
   for (int i = 0; i < 50; i++) {
     if (client_.connect(server_.c_str(), 2015)) { 
-      ok = true; break;
+      ok = true;
+      break;
     }
     delay(10);
     yield();
@@ -131,8 +132,8 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE - 1);
 
 
- // SoftVer
-  strncpy(reg.SoftVer, device_name_.c_str(), SUPLA_SOFTVER_MAXSIZE - 1);
+  // SoftVer
+  strncpy(reg.SoftVer, "GG v1", SUPLA_SOFTVER_MAXSIZE - 1);
 
    // ServerName (musi odpowiadać temu, co wpisujesz jako server)
   strncpy(reg.ServerName, server_.c_str(), SUPLA_SERVER_NAME_MAXSIZE - 1);
@@ -182,14 +183,72 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   
   hex_dump((const uint8_t*)&reg, payload_size, "REG-PAYLOAD");
 
- // -------------------------
+
+  yield();
+  delay(1);
+  
+  // -------------------------
   // Build SDP (RAW MODE)
   // -------------------------
-  yield();
-  delay(10);
-  //TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
-
+  TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
+  if (!sdp) {
+    ESP_LOGW("supla", "sproto_sdp_malloc failed");
+    client_.stop();
+    return false;
+  }
   ESP_LOGW("supla", "sproto_sdp_malloc OK");
+  
+  yield();
+  delay(1);
+  
+  sproto_sdp_init(sproto_ctx_, sdp);
+  
+  yield();
+  delay(1);
+
+  if (!sproto_set_data(sdp, (char*)&reg, (unsigned _supla_int_t)payload_size, call_id)) {
+    ESP_LOGW("supla", "sproto_set_data failed");
+    sproto_sdp_free(sdp);
+    client_.stop();
+    return false;
+  }
+
+  size_t packet_len =
+      sizeof(TSuplaDataPacket) - SUPLA_MAX_DATA_SIZE + sdp->data_size;
+
+  ESP_LOGI("supla", "Sending RAW REGISTER_DEVICE_G (call_id=%u), len=%u",
+           call_id, (unsigned)packet_len);
+
+  yield();
+  delay(1);
+  
+  hex_dump((uint8_t*)sdp, packet_len, "TX");
+
+  yield();
+  delay(1);
+
+  size_t sent = client_.write((uint8_t*)sdp, packet_len);
+
+  yield();
+  delay(1);
+  
+  client_.flush();
+
+  yield();
+  delay(1);
+  
+  sproto_sdp_free(sdp);
+
+  if (sent != packet_len) {
+    ESP_LOGW("supla", "Sent mismatch: %u != %u",
+             (unsigned)sent, (unsigned)packet_len);
+    client_.stop();
+    return false;
+  }
+
+  ESP_LOGI("supla", "REGISTER_DEVICE_G sent");
+
+
   yield();
   delay(1);
 
@@ -210,10 +269,6 @@ bool SuplaEsphomeBridge::read_register_response(WiFiClient &client,
   char inbuf[1536];
 
   while (millis() - start < timeout_ms) {
-    delay(1);
-    yield();
-  
-
     if (client.available()) {
 
       int r = client.read(inbuf, sizeof(inbuf));
@@ -222,7 +277,13 @@ bool SuplaEsphomeBridge::read_register_response(WiFiClient &client,
       ESP_LOGI("supla", "Received %d bytes", r);
       hex_dump((uint8_t*)inbuf, r, "RX");
 
+      yield();
+      delay(1);
+
       sproto_in_buffer_append(sproto_ctx_, inbuf, r);
+
+      yield();
+      delay(1);
 
       TSuplaDataPacket sdp;
       while (sproto_pop_in_sdp(sproto_ctx_, &sdp)) {
@@ -259,7 +320,7 @@ bool SuplaEsphomeBridge::read_register_response(WiFiClient &client,
         }
       }
     }
-
+    yield();
     delay(10);
   }
 
