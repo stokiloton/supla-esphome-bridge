@@ -107,7 +107,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   // -------------------------
   // Build TDS_SuplaRegisterDevice_G (Email + AuthKey)
   // -------------------------
-  TDS_SuplaRegisterDevice_G reg;
+  static TDS_SuplaRegisterDevice_G reg;
   memset(&reg, 0, sizeof(reg));
 
   yield();
@@ -190,7 +190,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   // -------------------------
   // Build SDP (RAW MODE)
   // -------------------------
-  TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
+  static TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
   if (!sdp) {
     ESP_LOGW("supla", "sproto_sdp_malloc failed");
     client_.stop();
