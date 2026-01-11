@@ -107,6 +107,27 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   memcpy(reg.GUID, GUID_BIN, SUPLA_GUID_SIZE);
 
 
+  
+    // Name (z YAML: device_name_)
+  if (!device_name_.empty()) {
+    strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE - 1);
+  } else {
+    strncpy(reg.Name, "esphomeDe", SUPLA_DEVICE_NAME_MAXSIZE - 1);
+  }
+
+  // SoftVer
+  strncpy(reg.SoftVer, "GG 1.0", SUPLA_SOFTVER_MAXSIZE - 1);
+
+  // ServerName (musi odpowiadać temu, co wpisujesz jako server)
+  strncpy(reg.ServerName, server_.c_str(), SUPLA_SERVER_NAME_MAXSIZE - 1);
+
+  // Flags, ManufacturerID, ProductID
+  reg.Flags = 0;
+  reg.ManufacturerID = SUPLA_MFR_UNKNOWN;
+  reg.ProductID = 0;
+  
+
+
 
   bool resp = read_register_response(client_, timeout_ms);
   client_.stop();
