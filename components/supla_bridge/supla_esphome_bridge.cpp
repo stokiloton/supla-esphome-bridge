@@ -46,6 +46,8 @@ void SuplaEsphomeBridge::loop() {
   if (!registered_ && millis() - last_try > 30000) {
     last_try = millis();
     register_device(10000);
+    yield();
+    delay(1);
   }
 }
 
@@ -86,7 +88,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
     if (client_.connect(server_.c_str(), 2015)) { 
       ok = true; break;
     }
-    delay(1);
+    delay(10);
     yield();
   }
   
@@ -176,7 +178,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
            (unsigned)payload_size, (unsigned)reg.channel_count);
 
   yield();
-  delay(1);
+  delay(10);
   
   hex_dump((const uint8_t*)&reg, payload_size, "REG-PAYLOAD");
 
