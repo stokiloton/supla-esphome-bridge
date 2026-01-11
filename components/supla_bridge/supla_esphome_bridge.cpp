@@ -1,27 +1,3 @@
-Kod REGISTER_DEVICE_E
-
-Poniżej znajduje się kompletny kod źródłowy implementujący rejestrację urządzenia SUPLA w trybie RAW z użyciem REGISTER_DEVICE_E, zgodny z SUPLA Cloud oraz Twoją istniejącą strukturą klasy.
-
-Kod zawiera:
-
-pełną obsługę REGISTER_DEVICE_E,
-
-wykorzystanie location_id_ i location_password_ z konfiguracji,
-
-kanał typu E (termometr),
-
-RAW‑mode,
-
-zgodność z SUPLA_PROTO_VERSION 28,
-
-poprawne liczenie payloadu i długości ramki,
-
-pełne logowanie i hex dump,
-
-minimalne zmiany względem Twojej wersji.
-
-Kompletna implementacja REGISTER_DEVICE_E
-
 #include "supla_esphome_bridge.h"
 #include <cstddef>
 #include <cstring>
