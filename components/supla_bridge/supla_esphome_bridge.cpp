@@ -84,7 +84,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   ESP_LOGI("supla", "Attempting register with call_id=%u (REGISTER_DEVICE_G)", call_id);
 
   // -------------------------
-  // Build TDS_SuplaRegisterDevice_G
+  // Build TDS_SuplaRegisterDevice_G (Email + AuthKey)
   // -------------------------
   TDS_SuplaRegisterDevice_G reg;
   memset(&reg, 0, sizeof(reg));
@@ -102,25 +102,26 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   // GUID
   memcpy(reg.GUID, GUID_BIN, SUPLA_GUID_SIZE);
 
-  // Name
+  // Name (z YAML: device_name_)
   if (!device_name_.empty()) {
     strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE - 1);
   } else {
-    strncpy(reg.Name, "esphome-device", SUPLA_DEVICE_NAME_MAXSIZE - 1);
+    strncpy(reg.Name, "esphome-supla-device", SUPLA_DEVICE_NAME_MAXSIZE - 1);
   }
 
-  // SoftVer (max 20 znaków!)
-  strncpy(reg.SoftVer, "esphome-bridge-1.0", SUPLA_SOFTVER_MAXSIZE - 1);
+  // SoftVer
+  strncpy(reg.SoftVer, "esphome-supla-bridge-1.0", SUPLA_SOFTVER_MAXSIZE - 1);
 
-  // ServerName
+  // ServerName (musi odpowiadać temu, co wpisujesz jako server)
   strncpy(reg.ServerName, server_.c_str(), SUPLA_SERVER_NAME_MAXSIZE - 1);
 
+  // Flags, ManufacturerID, ProductID
   reg.Flags = 0;
   reg.ManufacturerID = SUPLA_MFR_UNKNOWN;
   reg.ProductID = 0;
 
   // -------------------------
-  // One channel (E)
+  // One channel (TDS_SuplaDeviceChannel_E)
   // -------------------------
   reg.channel_count = 1;
 
@@ -145,8 +146,9 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
       offsetof(TDS_SuplaRegisterDevice_G, channels) +
       reg.channel_count * sizeof(TDS_SuplaDeviceChannel_E);
 
-  ESP_LOGI("supla", "Prepared REGISTER_DEVICE_G payload_size=%u", (unsigned)payload_size);
-  hex_dump((uint8_t*)&reg, payload_size, "REG-PAYLOAD");
+  ESP_LOGI("supla", "Prepared REGISTER_DEVICE_G payload_size=%u (channel_count=%u)",
+           (unsigned)payload_size, (unsigned)reg.channel_count);
+  hex_dump((const uint8_t*)&reg, payload_size, "REG-PAYLOAD");
 
   // -------------------------
   // Build SDP (RAW MODE)
@@ -160,7 +162,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 
   sproto_sdp_init(sproto_ctx_, sdp);
 
-  if (!sproto_set_data(sdp, (char*)&reg, payload_size, call_id)) {
+  if (!sproto_set_data(sdp, (char*)&reg, (unsigned _supla_int_t)payload_size, call_id)) {
     ESP_LOGW("supla", "sproto_set_data failed");
     sproto_sdp_free(sdp);
     client_.stop();
@@ -170,7 +172,8 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   size_t packet_len =
       sizeof(TSuplaDataPacket) - SUPLA_MAX_DATA_SIZE + sdp->data_size;
 
-  ESP_LOGI("supla", "Sending RAW REGISTER_DEVICE_G, len=%u", (unsigned)packet_len);
+  ESP_LOGI("supla", "Sending RAW REGISTER_DEVICE_G (call_id=%u), len=%u",
+           call_id, (unsigned)packet_len);
   hex_dump((uint8_t*)sdp, packet_len, "TX");
 
   size_t sent = client_.write((uint8_t*)sdp, packet_len);
@@ -178,7 +181,8 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   sproto_sdp_free(sdp);
 
   if (sent != packet_len) {
-    ESP_LOGW("supla", "Sent mismatch: %u != %u", (unsigned)sent, (unsigned)packet_len);
+    ESP_LOGW("supla", "Sent mismatch: %u != %u",
+             (unsigned)sent, (unsigned)packet_len);
     client_.stop();
     return false;
   }
@@ -236,6 +240,9 @@ bool SuplaEsphomeBridge::read_register_response(WiFiClient &client,
             registered_ = false;
             ESP_LOGW("supla", "Registration failed, code=%d", res.result_code);
             return false;
+          } else {
+            ESP_LOGW("supla", "Register result SDP too small: %u",
+                     (unsigned)sdp.data_size);
           }
         }
       }
