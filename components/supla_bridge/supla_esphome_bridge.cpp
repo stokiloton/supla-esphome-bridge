@@ -254,8 +254,8 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 
 
   
-  bool resp = true;
-  //bool resp = read_register_response(client_, timeout_ms);
+
+  bool resp = read_register_response(client_, timeout_ms);
   yield();
   delay(1);
   client_.stop();
