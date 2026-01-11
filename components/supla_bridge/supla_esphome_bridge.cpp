@@ -114,7 +114,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   delay(1);
 
   // EMAIL
-  strncpy(reg.Email, "tmp.spam.stokiloton@gmail.com", SUPLA_EMAIL_MAXSIZE - 1);
+  strncpy(reg.Email, "stokiloton@gmail.com", SUPLA_EMAIL_MAXSIZE - 1);
 
   // AUTHKEY (16 bytes, stały)
   static const uint8_t AUTHKEY[SUPLA_AUTHKEY_SIZE] = {
