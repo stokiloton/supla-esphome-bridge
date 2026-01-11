@@ -76,10 +76,22 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   }
   
   ESP_LOGI("supla", "client_.setTimeout(1000)");
-  client_.setTimeout(1000);
-
+  client_.setTimeout(3000);
+  yield();
+  delay(1);
+  
   ESP_LOGI("supla", "Connecting to SUPLA server %s:2015", server_.c_str());
-  if (!client_.connect(server_.c_str(), 2015)) {
+
+  bool ok = false;
+  for (int i = 0; i < 50; i++) {
+    if (client_.connect(server_.c_str(), 2015)) { 
+      ok = true; break;
+    }
+    delay(10);
+    yield();
+  }
+  
+  if (!ok) {
     ESP_LOGW("supla", "Cannot connect to SUPLA server");
     return false;
   }
@@ -182,6 +194,9 @@ bool SuplaEsphomeBridge::read_register_response(WiFiClient &client,
   char inbuf[1536];
 
   while (millis() - start < timeout_ms) {
+    delay(1);
+    yield();
+  
 
     if (client.available()) {
 
