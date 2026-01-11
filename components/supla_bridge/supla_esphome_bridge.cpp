@@ -153,6 +153,48 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   //hex_dump((const uint8_t*)&reg, payload_size, "REG-PAYLOAD");
 
 
+
+ // -------------------------
+  // Build SDP (RAW MODE)
+  // -------------------------
+  TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
+  if (!sdp) {
+    ESP_LOGW("supla", "sproto_sdp_malloc failed");
+    client_.stop();
+    return false;
+  }
+
+  sproto_sdp_init(sproto_ctx_, sdp);
+
+  if (!sproto_set_data(sdp, (char*)&reg, (unsigned _supla_int_t)payload_size, call_id)) {
+    ESP_LOGW("supla", "sproto_set_data failed");
+    sproto_sdp_free(sdp);
+    client_.stop();
+    return false;
+  }
+
+  size_t packet_len =
+      sizeof(TSuplaDataPacket) - SUPLA_MAX_DATA_SIZE + sdp->data_size;
+
+  ESP_LOGI("supla", "Sending RAW REGISTER_DEVICE_G (call_id=%u), len=%u",
+           call_id, (unsigned)packet_len);
+ // hex_dump((uint8_t*)sdp, packet_len, "TX");
+
+  size_t sent = client_.write((uint8_t*)sdp, packet_len);
+  client_.flush();
+  sproto_sdp_free(sdp);
+
+  if (sent != packet_len) {
+    ESP_LOGW("supla", "Sent mismatch: %u != %u",
+             (unsigned)sent, (unsigned)packet_len);
+    client_.stop();
+    return false;
+  }
+
+  ESP_LOGI("supla", "REGISTER_DEVICE_G sent");
+
+  
+
   bool resp = read_register_response(client_, timeout_ms);
   client_.stop();
   return resp;
