@@ -113,9 +113,13 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
  // SoftVer
   strncpy(reg.SoftVer, device_name_.c_str(), SUPLA_SOFTVER_MAXSIZE - 1);
 
-
-
-
+   // ServerName (musi odpowiadać temu, co wpisujesz jako server)
+  strncpy(reg.ServerName, server_.c_str(), SUPLA_SERVER_NAME_MAXSIZE - 1);
+  
+  // Flags, ManufacturerID, ProductID
+  reg.Flags = 0;
+  reg.ManufacturerID = 0;
+  reg.ProductID = 0;
   
 
 
