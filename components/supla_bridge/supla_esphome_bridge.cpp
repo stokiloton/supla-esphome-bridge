@@ -74,7 +74,9 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
     return false;
   }
   
-  client_.setTimeout(3000);
+  ESP_LOGI("supla", "client_.setTimeout(1000)");
+  client_.setTimeout(1000);
+
   ESP_LOGI("supla", "Connecting to SUPLA server %s:2015", server_.c_str());
   if (!client_.connect(server_.c_str(), 2015)) {
     ESP_LOGW("supla", "Cannot connect to SUPLA server");
@@ -86,111 +88,6 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   const unsigned call_id = SUPLA_DS_CALL_REGISTER_DEVICE_G;
   ESP_LOGI("supla", "Attempting register with call_id=%u (REGISTER_DEVICE_G)", call_id);
 
-  // -------------------------
-  // Build TDS_SuplaRegisterDevice_G (Email + AuthKey)
-  // -------------------------
-  TDS_SuplaRegisterDevice_G reg;
-  memset(&reg, 0, sizeof(reg));
-
-  // EMAIL
-  strncpy(reg.Email, "tmp.spam.stokiloton@gmail.com", SUPLA_EMAIL_MAXSIZE - 1);
-
-  // AUTHKEY (16 bytes, stały)
-  static const uint8_t AUTHKEY[SUPLA_AUTHKEY_SIZE] = {
-    0xA3,0x5F,0x91,0x0C,0x77,0x2B,0x4E,0x88,
-    0x19,0xC4,0x5A,0x0D,0x6E,0x3F,0x12,0x99
-  };
-  memcpy(reg.AuthKey, AUTHKEY, SUPLA_AUTHKEY_SIZE);
-
-  // GUID
-  memcpy(reg.GUID, GUID_BIN, SUPLA_GUID_SIZE);
-
-  // Name (z YAML: device_name_)
-  if (!device_name_.empty()) {
-    strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE - 1);
-  } else {
-    strncpy(reg.Name, "esphomeDe", SUPLA_DEVICE_NAME_MAXSIZE - 1);
-  }
-
-  // SoftVer
-  strncpy(reg.SoftVer, "GG 1.0", SUPLA_SOFTVER_MAXSIZE - 1);
-
-  // ServerName (musi odpowiadać temu, co wpisujesz jako server)
-  strncpy(reg.ServerName, server_.c_str(), SUPLA_SERVER_NAME_MAXSIZE - 1);
-
-  // Flags, ManufacturerID, ProductID
-  reg.Flags = 0;
-  reg.ManufacturerID = SUPLA_MFR_UNKNOWN;
-  reg.ProductID = 0;
-
-  // -------------------------
-  // One channel (TDS_SuplaDeviceChannel_E)
-  // -------------------------
-  reg.channel_count = 1;
-
-  TDS_SuplaDeviceChannel_E &ch = reg.channels[0];
-  memset(&ch, 0, sizeof(ch));
-
-  ch.Number = 0;
-  ch.Type = SUPLA_CHANNELTYPE_THERMOMETER;
-  ch.FuncList = SUPLA_BIT_FUNC_THERMOMETER;
-  ch.Default = 0;
-  ch.Flags = 0;
-  ch.Offline = 0;
-  ch.ValueValidityTimeSec = 0;
-  memset(ch.value, 0, SUPLA_CHANNELVALUE_SIZE);
-  ch.DefaultIcon = 0;
-  ch.SubDeviceId = 0;
-
-  // -------------------------
-  // Payload size
-  // -------------------------
-  size_t payload_size =
-      offsetof(TDS_SuplaRegisterDevice_G, channels) +
-      reg.channel_count * sizeof(TDS_SuplaDeviceChannel_E);
-
-  ESP_LOGI("supla", "Prepared REGISTER_DEVICE_G payload_size=%u (channel_count=%u)",
-           (unsigned)payload_size, (unsigned)reg.channel_count);
-  hex_dump((const uint8_t*)&reg, payload_size, "REG-PAYLOAD");
-
-  // -------------------------
-  // Build SDP (RAW MODE)
-  // -------------------------
-  TSuplaDataPacket *sdp = sproto_sdp_malloc(sproto_ctx_);
-  if (!sdp) {
-    ESP_LOGW("supla", "sproto_sdp_malloc failed");
-    client_.stop();
-    return false;
-  }
-
-  sproto_sdp_init(sproto_ctx_, sdp);
-
-  if (!sproto_set_data(sdp, (char*)&reg, (unsigned _supla_int_t)payload_size, call_id)) {
-    ESP_LOGW("supla", "sproto_set_data failed");
-    sproto_sdp_free(sdp);
-    client_.stop();
-    return false;
-  }
-
-  size_t packet_len =
-      sizeof(TSuplaDataPacket) - SUPLA_MAX_DATA_SIZE + sdp->data_size;
-
-  ESP_LOGI("supla", "Sending RAW REGISTER_DEVICE_G (call_id=%u), len=%u",
-           call_id, (unsigned)packet_len);
-  hex_dump((uint8_t*)sdp, packet_len, "TX");
-
-  size_t sent = client_.write((uint8_t*)sdp, packet_len);
-  client_.flush();
-  sproto_sdp_free(sdp);
-
-  if (sent != packet_len) {
-    ESP_LOGW("supla", "Sent mismatch: %u != %u",
-             (unsigned)sent, (unsigned)packet_len);
-    client_.stop();
-    return false;
-  }
-
-  ESP_LOGI("supla", "REGISTER_DEVICE_G sent");
 
   bool resp = read_register_response(client_, timeout_ms);
   client_.stop();
