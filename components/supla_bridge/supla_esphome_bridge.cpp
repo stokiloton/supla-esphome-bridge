@@ -122,6 +122,24 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   reg.ProductID = 0;
   
 
+  // -------------------------
+  // One channel (TDS_SuplaDeviceChannel_E)
+  // -------------------------
+  reg.channel_count = 1;
+
+  TDS_SuplaDeviceChannel_E &ch = reg.channels[0];
+  memset(&ch, 0, sizeof(ch));
+
+  ch.Number = 0;
+  ch.Type = SUPLA_CHANNELTYPE_THERMOMETER;
+  ch.FuncList = SUPLA_BIT_FUNC_THERMOMETER;
+  ch.Default = 0;
+  ch.Flags = 0;
+  ch.Offline = 0;
+  ch.ValueValidityTimeSec = 0;
+  memset(ch.value, 0, SUPLA_CHANNELVALUE_SIZE);
+  ch.DefaultIcon = 0;
+  ch.SubDeviceId = 0;
 
 
   bool resp = read_register_response(client_, timeout_ms);
