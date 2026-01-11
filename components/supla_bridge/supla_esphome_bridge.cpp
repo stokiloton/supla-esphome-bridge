@@ -73,14 +73,16 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
     ESP_LOGW("supla", "No SUPLA server configured");
     return false;
   }
-
-  ESP_LOGI("supla", "Connecting to SUPLA server %s:2015", server_.c_str());
+  
   client_.setTimeout(3000);
+  ESP_LOGI("supla", "Connecting to SUPLA server %s:2015", server_.c_str());
   if (!client_.connect(server_.c_str(), 2015)) {
     ESP_LOGW("supla", "Cannot connect to SUPLA server");
     return false;
   }
+  ESP_LOGI("supla", "Connected to SUPLA server %s:2015", server_.c_str());
 
+  
   const unsigned call_id = SUPLA_DS_CALL_REGISTER_DEVICE_G;
   ESP_LOGI("supla", "Attempting register with call_id=%u (REGISTER_DEVICE_G)", call_id);
 
