@@ -37,7 +37,7 @@ void SuplaEsphomeBridge::setup() {
 
 void SuplaEsphomeBridge::loop() {
   static unsigned long last_try = 0;
-  if (!registered_ && millis() - last_try > 30000) {
+  if (!registered_ && millis() - last_try > 40000) {
     last_try = millis();
     register_device(3000);
     yield();
@@ -155,9 +155,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   yield();
   delay(1);
 
-  // -------------------------
-  // One channel (TDS_SuplaDeviceChannel_D)
-  // -------------------------
+
   reg.channel_count = 1;
 
   TDS_SuplaDeviceChannel_D &ch = reg.channels[0];
@@ -245,7 +243,7 @@ fill_channel_D(
   size_t packet_len =
       sizeof(TSuplaDataPacket) - SUPLA_MAX_DATA_SIZE + sdp->data_size;
 
-  ESP_LOGI("supla", "Sending RAW REGISTER_DEVICE_C (call_id=%u), len=%u",
+  ESP_LOGI("supla", "Sending RAW REGISTER_DEVICE_F (call_id=%u), len=%u",
            call_id, (unsigned)packet_len);
 
   yield();
