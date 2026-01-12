@@ -100,7 +100,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   ESP_LOGI("supla", "Attempting register with call_id=%u (REGISTER_DEVICE_F)", call_id);
 
   // -------------------------
-  // Build TDS_SuplaRegisterDevice_C
+  // Build TDS_SuplaRegisterDevice_F
   // -------------------------
   static TDS_SuplaRegisterDevice_F reg;
   memset(&reg, 0, sizeof(reg));
@@ -199,10 +199,10 @@ fill_channel_D(
   delay(1);
 
   size_t payload_size =
-      offsetof(TDS_SuplaRegisterDevice_C, channels) +
-      reg.channel_count * sizeof(TDS_SuplaDeviceChannel_B);
+      offsetof(TDS_SuplaRegisterDevice_F, channels) +
+      reg.channel_count * sizeof(TDS_SuplaDeviceChannel_D);
 
-  ESP_LOGI("supla", "Prepared REGISTER_DEVICE_C payload_size=%u (channel_count=%u)",
+  ESP_LOGI("supla", "Prepared REGISTER_DEVICE_F payload_size=%u (channel_count=%u)",
            (unsigned)payload_size, (unsigned)reg.channel_count);
 
   yield();
