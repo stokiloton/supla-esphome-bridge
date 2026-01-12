@@ -31,7 +31,20 @@ class SuplaEsphomeBridge : public esphome::Component {
   void loop() override;
 
   // Ręczna rejestracja
-  bool register_device(unsigned long timeout_ms = 10000);
+  bool register_device(unsigned long timeout_ms = 3000);
+
+void fill_channel_D(
+    TDS_SuplaDeviceChannel_D &ch,
+    uint8_t number,
+    int type,
+    int func,
+    int default_value,
+    int64_t flags,
+    bool offline,
+    unsigned value_validity_sec,
+    const char *initial_value,
+    uint8_t default_icon
+);
 
   bool is_registered() const { return registered_; }
 
