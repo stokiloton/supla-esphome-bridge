@@ -297,9 +297,7 @@ bool SuplaEsphomeBridge::read_register_response(WiFiClient &client,
         ESP_LOGI("supla", "Parsed SDP: call_id=%u size=%u",
                  (unsigned)sdp.call_id, (unsigned)sdp.data_size);
 
-        if (sdp.call_id == SUPLA_SD_CALL_REGISTER_DEVICE_RESULT ||
-            sdp.call_id == SUPLA_SD_CALL_REGISTER_DEVICE_RESULT_B ||
-            sdp.call_id == SUPLA_SD_CALL_REGISTER_DEVICE_RESULT_C) {
+        if (sdp.call_id == SUPLA_SD_CALL_REGISTER_DEVICE_RESULT ) {
 
           if (sdp.data_size >= sizeof(TSD_SuplaRegisterDeviceResult)) {
 
