@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #ifndef SUPLA_PROTO_VERSION
-#define SUPLA_PROTO_VERSION 23
+#define SUPLA_PROTO_VERSION 5
 #endif
 
 
@@ -244,6 +244,9 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 
   yield();
   delay(1);
+  
+  //tymczsow 1 proba
+  registered_ = true;
 
   bool resp = read_register_response(client_, timeout_ms);
   yield();
