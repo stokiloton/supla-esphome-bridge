@@ -173,7 +173,7 @@ fill_channel_D(
     false,                              // Offline
     0,                                  // ValueValidityTimeSec
     "0",                                // initial value
-    SUPLA_ICON_RELAY                    // DefaultIcon
+    0                    // DefaultIcon
 );
 
   
