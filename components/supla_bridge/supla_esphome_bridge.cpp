@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #ifndef SUPLA_PROTO_VERSION
-#define SUPLA_PROTO_VERSION 6
+#define SUPLA_PROTO_VERSION 23
 #endif
 
 
@@ -96,27 +96,39 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   yield();
   delay(1);
   
-  const unsigned call_id = SUPLA_DS_CALL_REGISTER_DEVICE_C;
-  ESP_LOGI("supla", "Attempting register with call_id=%u (REGISTER_DEVICE_C)", call_id);
+  const unsigned call_id = SUPLA_DS_CALL_REGISTER_DEVICE_F;
+  ESP_LOGI("supla", "Attempting register with call_id=%u (REGISTER_DEVICE_F)", call_id);
 
   // -------------------------
   // Build TDS_SuplaRegisterDevice_C
   // -------------------------
-  static TDS_SuplaRegisterDevice_C reg;
+  static TDS_SuplaRegisterDevice_F reg;
   memset(&reg, 0, sizeof(reg));
 
   yield();
   delay(1);
 
   // LocationID / LocationPWD
-  reg.LocationID = location_id_;
+ // reg.LocationID = location_id_;
 
-  strncpy(reg.LocationPWD, location_password_.c_str(), SUPLA_LOCATION_PWD_MAXSIZE - 1);
-  reg.LocationPWD[SUPLA_LOCATION_PWD_MAXSIZE - 1] = '\0';
+ // strncpy(reg.LocationPWD, location_password_.c_str(), SUPLA_LOCATION_PWD_MAXSIZE - 1);
+  //reg.LocationPWD[SUPLA_LOCATION_PWD_MAXSIZE - 1] = '\0';
+
+  // EMAIL
+  strncpy(reg.Email, "stokiloton@gmail.com", SUPLA_EMAIL_MAXSIZE - 1);
+  reg.Email[SUPLA_EMAIL_MAXSIZE - 1] = '\0';
+
+  // AUTHKEY (16 bytes, stały)
+  static const uint8_t AUTHKEY[SUPLA_AUTHKEY_SIZE] = {
+    0xA3,0x5F,0x91,0x0C,0x67,0x2B,0x4E,0x88,
+    0x19,0xC4,0x5A,0x0D,0x6E,0x3F,0x12,0x99
+  };
+  memcpy(reg.AuthKey, AUTHKEY, SUPLA_AUTHKEY_SIZE);
+  
 
   // GUID: 1C81FE5A-DDDD-BCD1-FCC1-0F42C159618E
   uint8_t GUID_BIN[SUPLA_GUID_SIZE] = {
-    0x1C, 0x81, 0xFE, 0x5A, 0xDD, 0xDD, 0xBC, 0xD1,
+    0x1C, 0x81, 0xFE, 0x5A, 0xED, 0xDD, 0xBC, 0xD1,
     0xFC, 0xC1, 0x0F, 0x42, 0xC1, 0x59, 0x61, 0x8E
   };
 
@@ -136,29 +148,47 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   reg.ServerName[SUPLA_SERVER_NAME_MAXSIZE - 1] = '\0';
   
   // Flags, ManufacturerID, ProductID
- // reg.Flags = 0;
- // reg.ManufacturerID = 0;
- // reg.ProductID = 0;
+  reg.Flags = 0;
+  reg.ManufacturerID = 0;
+  reg.ProductID = 0;
 
   yield();
   delay(1);
 
   // -------------------------
-  // One channel (TDS_SuplaDeviceChannel_B)
+  // One channel (TDS_SuplaDeviceChannel_D)
   // -------------------------
   reg.channel_count = 1;
 
-  TDS_SuplaDeviceChannel_B &ch = reg.channels[0];
-  memset(&ch, 0, sizeof(ch));
+  TDS_SuplaDeviceChannel_D &ch = reg.channels[0];
 
-  ch.Number = 0;
-  ch.Type = SUPLA_CHANNELTYPE_THERMOMETER;
-  ch.FuncList = SUPLA_BIT_FUNC_THERMOMETER;
-  ch.Default = 0;
+
+fill_channel_D(
+    ch,
+    0,                                  // Number
+    SUPLA_CHANNELTYPE_RELAY,            // Type
+    SUPLA_CHANNELFNC_POWERSWITCH,       // FuncList
+    0,                                  // Default
+    0,                                  // Flags
+    false,                              // Offline
+    0,                                  // ValueValidityTimeSec
+    "0",                                // initial value
+    SUPLA_ICON_RELAY                    // DefaultIcon
+);
+
+  
+  //memset(&ch, 0, sizeof(ch));
+
+  //ch.Number = 0;
+  //ch.Type = SUPLA_CHANNELTYPE_THERMOMETER;
+  //ch.FuncList = SUPLA_BIT_FUNC_THERMOMETER;
+  //ch.Default = 0;
+  
   //ch.Flags = 0;
   //ch.Offline = 0;
   //ch.ValueValidityTimeSec = 0;
-  memset(ch.value, 0, SUPLA_CHANNELVALUE_SIZE);
+  
+  //memset(ch.value, 0, SUPLA_CHANNELVALUE_SIZE);
   //ch.DefaultIcon = 0;
   //ch.SubDeviceId = 0;
 
@@ -248,7 +278,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
     return false;
   }
 
-  ESP_LOGI("supla", "REGISTER_DEVICE_C sent");
+  ESP_LOGI("supla", "REGISTER_DEVICE_F sent");
 
   yield();
   delay(1);
@@ -267,6 +297,58 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   client_.stop();
   return resp;
 }
+
+
+void fill_channel_D(
+    TDS_SuplaDeviceChannel_D &ch,
+    uint8_t number,
+    int type,
+    int func,
+    int default_value,
+    int64_t flags,
+    bool offline,
+    unsigned value_validity_sec,
+    const char *initial_value,
+    uint8_t default_icon
+) {
+    // Wyzerowanie całej struktury (bardzo ważne!)
+    memset(&ch, 0, sizeof(TDS_SuplaDeviceChannel_D));
+
+    // Numer kanału
+    ch.Number = number;
+
+    // Typ kanału (np. SUPLA_CHANNELTYPE_RELAY)
+    ch.Type = type;
+
+    // Funkcja kanału (np. SUPLA_CHANNELFNC_POWERSWITCH)
+    ch.FuncList = func;
+
+    // Wartość domyślna (np. 0/1)
+    ch.Default = default_value;
+
+    // Flagi kanału (np. SUPLA_CHANNEL_FLAG_RUNTIME_CHANNEL_CONFIG)
+    ch.Flags = flags;
+
+    // Czy kanał jest offline
+    ch.Offline = offline ? 1 : 0;
+
+    // Czas ważności wartości (0 = bez limitu)
+    ch.ValueValidityTimeSec = value_validity_sec;
+
+    // Wartość początkowa
+    if (initial_value) {
+        strncpy(ch.value, initial_value, SUPLA_CHANNELVALUE_SIZE - 1);
+        ch.value[SUPLA_CHANNELVALUE_SIZE - 1] = '\0';
+    }
+
+    // Ikona domyślna (np. SUPLA_ICON_RELAY)
+    ch.DefaultIcon = default_icon;
+}
+
+
+
+
+
 
 bool SuplaEsphomeBridge::read_register_response(WiFiClient &client,
                                                 unsigned long timeout_ms) {
