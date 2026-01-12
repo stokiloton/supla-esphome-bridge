@@ -115,7 +115,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   reg.LocationPWD[SUPLA_LOCATION_PWD_MAXSIZE - 1] = '\0';
 
   // GUID: 1C81FE5A-DDDD-BCD1-FCC1-0F42C159618E
-  const uint8_t SuplaEsphomeBridge::GUID_BIN[SUPLA_GUID_SIZE] = {
+  uint8_t GUID_BIN[SUPLA_GUID_SIZE] = {
     0x1C, 0x81, 0xFE, 0x5A, 0xDD, 0xDD, 0xBC, 0xD1,
     0xFC, 0xC1, 0x0F, 0x42, 0xC1, 0x59, 0x61, 0x8E
   };
