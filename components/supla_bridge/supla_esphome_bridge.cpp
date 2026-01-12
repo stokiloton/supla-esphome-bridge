@@ -4,12 +4,10 @@
 #include <cstdint>
 
 #ifndef SUPLA_PROTO_VERSION
-#define SUPLA_PROTO_VERSION 28
+#define SUPLA_PROTO_VERSION 23
 #endif
 
-#ifndef SUPLA_DS_CALL_REGISTER_DEVICE_E
-#define SUPLA_DS_CALL_REGISTER_DEVICE_E 69
-#endif
+
 
 namespace supla_esphome_bridge {
 
