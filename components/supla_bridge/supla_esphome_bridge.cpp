@@ -11,11 +11,7 @@
 
 namespace supla_esphome_bridge {
 
-// GUID: 1C81FE5A-DDDD-BCD1-FCC1-0F42C159618E
-const uint8_t SuplaEsphomeBridge::GUID_BIN[SUPLA_GUID_SIZE] = {
-  0x1C, 0x81, 0xFE, 0x5A, 0xDD, 0xDD, 0xBC, 0xD1,
-  0xFC, 0xC1, 0x0F, 0x42, 0xC1, 0x59, 0x61, 0x8E
-};
+
 
 SuplaEsphomeBridge::SuplaEsphomeBridge() {
   sproto_ctx_ = sproto_init();
@@ -116,19 +112,28 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   reg.LocationID = location_id_;
 
   strncpy(reg.LocationPWD, location_password_.c_str(), SUPLA_LOCATION_PWD_MAXSIZE - 1);
-  //reg.LocationPWD[SUPLA_LOCATION_PWD_MAXSIZE - 1] = '\0';
+  reg.LocationPWD[SUPLA_LOCATION_PWD_MAXSIZE - 1] = '\0';
+
+  // GUID: 1C81FE5A-DDDD-BCD1-FCC1-0F42C159618E
+  const uint8_t SuplaEsphomeBridge::GUID_BIN[SUPLA_GUID_SIZE] = {
+    0x1C, 0x81, 0xFE, 0x5A, 0xDD, 0xDD, 0xBC, 0xD1,
+    0xFC, 0xC1, 0x0F, 0x42, 0xC1, 0x59, 0x61, 0x8E
+  };
 
   // GUID
   memcpy(reg.GUID, GUID_BIN, SUPLA_GUID_SIZE);
 
   // Name
   strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE - 1);
+  reg.Name[SUPLA_DEVICE_NAME_MAXSIZE - 1] = '\0';
 
   // SoftVer
   strncpy(reg.SoftVer, "GGv1", SUPLA_SOFTVER_MAXSIZE - 1);
+  reg.SoftVer[SUPLA_SOFTVER_MAXSIZE - 1] = '\0';
 
   // ServerName
   strncpy(reg.ServerName, server_.c_str(), SUPLA_SERVER_NAME_MAXSIZE - 1);
+  reg.ServerName[SUPLA_SERVER_NAME_MAXSIZE - 1] = '\0';
   
   // Flags, ManufacturerID, ProductID
  // reg.Flags = 0;
@@ -286,11 +291,15 @@ bool SuplaEsphomeBridge::read_register_response(WiFiClient &client,
       TSuplaDataPacket sdp;
       while (sproto_pop_in_sdp(sproto_ctx_, &sdp)) {
 
+              yield();
+      delay(1);
+
         ESP_LOGI("supla", "Parsed SDP: call_id=%u size=%u",
                  (unsigned)sdp.call_id, (unsigned)sdp.data_size);
 
         if (sdp.call_id == SUPLA_SD_CALL_REGISTER_DEVICE_RESULT ||
-            sdp.call_id == SUPLA_SD_CALL_REGISTER_DEVICE_RESULT_B) {
+            sdp.call_id == SUPLA_SD_CALL_REGISTER_DEVICE_RESULT_B ||
+            sdp.call_id == SUPLA_SD_CALL_REGISTER_DEVICE_RESULT_C) {
 
           if (sdp.data_size >= sizeof(TSD_SuplaRegisterDeviceResult)) {
 
@@ -308,7 +317,7 @@ bool SuplaEsphomeBridge::read_register_response(WiFiClient &client,
               return true;
             }
 
-            registered_ = false;
+           // registered_ = false;
             ESP_LOGW("supla", "Registration failed, code=%d", res.result_code);
             return false;
           } else {
@@ -319,7 +328,7 @@ bool SuplaEsphomeBridge::read_register_response(WiFiClient &client,
       }
     }
     yield();
-    delay(10);
+    delay(5);
   }
 
   ESP_LOGW("supla", "Timeout waiting for register response");
