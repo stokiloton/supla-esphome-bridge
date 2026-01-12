@@ -116,7 +116,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 
   // EMAIL
   strncpy(reg.Email, "stokiloton@gmail.com", SUPLA_EMAIL_MAXSIZE - 1);
-  reg.Email[SUPLA_EMAIL_MAXSIZE - 1] = '\0';
+  //reg.Email[SUPLA_EMAIL_MAXSIZE - 1] = '\0';
 
   // AUTHKEY (16 bytes, stały)
   static const uint8_t AUTHKEY[SUPLA_AUTHKEY_SIZE] = {
@@ -137,15 +137,15 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 
   // Name
   strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE - 1);
-  reg.Name[SUPLA_DEVICE_NAME_MAXSIZE - 1] = '\0';
+  //reg.Name[SUPLA_DEVICE_NAME_MAXSIZE - 1] = '\0';
 
   // SoftVer
   strncpy(reg.SoftVer, "GGv1", SUPLA_SOFTVER_MAXSIZE - 1);
-  reg.SoftVer[SUPLA_SOFTVER_MAXSIZE - 1] = '\0';
+  //reg.SoftVer[SUPLA_SOFTVER_MAXSIZE - 1] = '\0';
 
   // ServerName
   strncpy(reg.ServerName, server_.c_str(), SUPLA_SERVER_NAME_MAXSIZE - 1);
-  reg.ServerName[SUPLA_SERVER_NAME_MAXSIZE - 1] = '\0';
+  //reg.ServerName[SUPLA_SERVER_NAME_MAXSIZE - 1] = '\0';
   
   // Flags, ManufacturerID, ProductID
   reg.Flags = 0;
@@ -234,7 +234,7 @@ fill_channel_D(
   
   ESP_LOGI("supla", "SUPLA_MAX_DATA_SIZE=%u , payload_size=%u, dat_size=%u  ", SUPLA_MAX_DATA_SIZE, payload_size, dat_size);
   
-  if (!sproto_set_data(sdp, (char*)&reg, (unsigned _supla_int_t)dat_size, call_id)) {
+  if (!sproto_set_data(sdp, (char*)&reg, (unsigned _supla_int_t)payload_size, call_id)) {
     ESP_LOGW("supla", "sproto_set_data failed");
     sproto_sdp_free(sdp);
     client_.stop();
