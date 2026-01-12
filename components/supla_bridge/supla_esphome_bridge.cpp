@@ -125,7 +125,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE - 1);
 
   // SoftVer
-  strncpy(reg.SoftVer, "ESPHome SUPLA v1", SUPLA_SOFTVER_MAXSIZE - 1);
+  strncpy(reg.SoftVer, "GGv1", SUPLA_SOFTVER_MAXSIZE - 1);
 
   // ServerName
   strncpy(reg.ServerName, server_.c_str(), SUPLA_SERVER_NAME_MAXSIZE - 1);
