@@ -230,9 +230,11 @@ fill_channel_D(
   yield();
   delay(1);
 
-  ESP_LOGI("supla", "SUPLA_MAX_DATA_SIZE=%u", SUPLA_MAX_DATA_SIZE);
+  size_t dat_size = sizeof(TDS_SuplaRegisterDevice_F);
   
-  if (!sproto_set_data(sdp, (char*)&reg, (unsigned _supla_int_t)payload_size, call_id)) {
+  ESP_LOGI("supla", "SUPLA_MAX_DATA_SIZE=%u , payload_size=%u, dat_size=%u  ", SUPLA_MAX_DATA_SIZE, payload_size, dat_size);
+  
+  if (!sproto_set_data(sdp, (char*)&reg, (unsigned _supla_int_t)dat_size, call_id)) {
     ESP_LOGW("supla", "sproto_set_data failed");
     sproto_sdp_free(sdp);
     client_.stop();
