@@ -299,7 +299,7 @@ fill_channel_D(
 }
 
 
-void fill_channel_D(
+void SuplaEsphomeBridge::fill_channel_D(
     TDS_SuplaDeviceChannel_D &ch,
     uint8_t number,
     int type,
