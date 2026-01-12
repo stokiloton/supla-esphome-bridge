@@ -256,9 +256,8 @@ fill_channel_D(
   yield();
   delay(1);
 
-    size_t packet_len2 = sizeof(sdp);
 
-  size_t sent = client_.write((uint8_t*)sdp, packet_len2);
+  size_t sent = client_.write((uint8_t*)sdp, packet_len);
 
   yield();
   delay(1);
