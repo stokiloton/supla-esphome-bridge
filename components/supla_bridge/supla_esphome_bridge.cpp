@@ -102,13 +102,13 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   yield();
   delay(1);
   
-  const unsigned call_id = SUPLA_DS_CALL_REGISTER_DEVICE_E;
-  ESP_LOGI("supla", "Attempting register with call_id=%u (REGISTER_DEVICE_E)", call_id);
+  const unsigned call_id = SUPLA_DS_CALL_REGISTER_DEVICE_C;
+  ESP_LOGI("supla", "Attempting register with call_id=%u (REGISTER_DEVICE_C)", call_id);
 
   // -------------------------
-  // Build TDS_SuplaRegisterDevice_E
+  // Build TDS_SuplaRegisterDevice_C
   // -------------------------
-  static TDS_SuplaRegisterDevice_E reg;
+  static TDS_SuplaRegisterDevice_C reg;
   memset(&reg, 0, sizeof(reg));
 
   yield();
@@ -116,7 +116,9 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 
   // LocationID / LocationPWD
   reg.LocationID = location_id_;
+
   strncpy(reg.LocationPWD, location_password_.c_str(), SUPLA_LOCATION_PWD_MAXSIZE - 1);
+  //reg.LocationPWD[SUPLA_LOCATION_PWD_MAXSIZE - 1] = '\0';
 
   // GUID
   memcpy(reg.GUID, GUID_BIN, SUPLA_GUID_SIZE);
@@ -131,31 +133,31 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   strncpy(reg.ServerName, server_.c_str(), SUPLA_SERVER_NAME_MAXSIZE - 1);
   
   // Flags, ManufacturerID, ProductID
-  reg.Flags = 0;
-  reg.ManufacturerID = 0;
-  reg.ProductID = 0;
+ // reg.Flags = 0;
+ // reg.ManufacturerID = 0;
+ // reg.ProductID = 0;
 
   yield();
   delay(1);
 
   // -------------------------
-  // One channel (TDS_SuplaDeviceChannel_E)
+  // One channel (TDS_SuplaDeviceChannel_B)
   // -------------------------
   reg.channel_count = 1;
 
-  TDS_SuplaDeviceChannel_E &ch = reg.channels[0];
+  TDS_SuplaDeviceChannel_B &ch = reg.channels[0];
   memset(&ch, 0, sizeof(ch));
 
   ch.Number = 0;
   ch.Type = SUPLA_CHANNELTYPE_THERMOMETER;
   ch.FuncList = SUPLA_BIT_FUNC_THERMOMETER;
   ch.Default = 0;
-  ch.Flags = 0;
-  ch.Offline = 0;
-  ch.ValueValidityTimeSec = 0;
+  //ch.Flags = 0;
+  //ch.Offline = 0;
+  //ch.ValueValidityTimeSec = 0;
   memset(ch.value, 0, SUPLA_CHANNELVALUE_SIZE);
-  ch.DefaultIcon = 0;
-  ch.SubDeviceId = 0;
+  //ch.DefaultIcon = 0;
+  //ch.SubDeviceId = 0;
 
   // -------------------------
   // Payload size
@@ -164,10 +166,10 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   delay(1);
 
   size_t payload_size =
-      offsetof(TDS_SuplaRegisterDevice_E, channels) +
-      reg.channel_count * sizeof(TDS_SuplaDeviceChannel_E);
+      offsetof(TDS_SuplaRegisterDevice_C, channels) +
+      reg.channel_count * sizeof(TDS_SuplaDeviceChannel_B);
 
-  ESP_LOGI("supla", "Prepared REGISTER_DEVICE_E payload_size=%u (channel_count=%u)",
+  ESP_LOGI("supla", "Prepared REGISTER_DEVICE_C payload_size=%u (channel_count=%u)",
            (unsigned)payload_size, (unsigned)reg.channel_count);
 
   yield();
@@ -197,7 +199,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   yield();
   delay(1);
 
-  ESP_LOGI("supla", "SUPLA_MAX_DATA_SIZE=%u (REGISTER_DEVICE_E)", SUPLA_MAX_DATA_SIZE );
+  ESP_LOGI("supla", "SUPLA_MAX_DATA_SIZE=%u", SUPLA_MAX_DATA_SIZE);
   
   if (!sproto_set_data(sdp, (char*)&reg, (unsigned _supla_int_t)payload_size, call_id)) {
     ESP_LOGW("supla", "sproto_set_data failed");
@@ -205,11 +207,12 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
     client_.stop();
     return false;
   }
+  ESP_LOGW("supla", "sproto_set_data OK");
 
   size_t packet_len =
       sizeof(TSuplaDataPacket) - SUPLA_MAX_DATA_SIZE + sdp->data_size;
 
-  ESP_LOGI("supla", "Sending RAW REGISTER_DEVICE_E (call_id=%u), len=%u",
+  ESP_LOGI("supla", "Sending RAW REGISTER_DEVICE_C (call_id=%u), len=%u",
            call_id, (unsigned)packet_len);
 
   yield();
@@ -239,7 +242,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
     return false;
   }
 
-  ESP_LOGI("supla", "REGISTER_DEVICE_E sent");
+  ESP_LOGI("supla", "REGISTER_DEVICE_C sent");
 
   yield();
   delay(1);
