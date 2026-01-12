@@ -39,7 +39,7 @@ void SuplaEsphomeBridge::loop() {
   static unsigned long last_try = 0;
   if (!registered_ && millis() - last_try > 30000) {
     last_try = millis();
-    register_device(10000);
+    register_device(3000);
     yield();
     delay(1);
   }
@@ -238,6 +238,9 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   
   sproto_sdp_free(sdp);
 
+      yield();
+    delay(1);
+
   if (sent != packet_len) {
     ESP_LOGW("supla", "Sent mismatch: %u != %u",
             (unsigned)sent, (unsigned)packet_len);
@@ -272,61 +275,24 @@ bool SuplaEsphomeBridge::read_register_response(WiFiClient &client,
   char inbuf[1536];
 
   while (millis() - start < timeout_ms) {
+    yield();
+    delay(1);
     if (client.available()) {
 
       int r = client.read(inbuf, sizeof(inbuf));
       if (r <= 0) continue;
 
+          yield();
+    delay(1);
+
       ESP_LOGI("supla", "Received %d bytes", r);
       hex_dump((uint8_t*)inbuf, r, "RX");
 
-      yield();
-      delay(1);
-
-      sproto_in_buffer_append(sproto_ctx_, inbuf, r);
-
-      yield();
-      delay(1);
-
-      TSuplaDataPacket sdp;
-      while (sproto_pop_in_sdp(sproto_ctx_, &sdp)) {
-
-              yield();
-      delay(1);
-
-        ESP_LOGI("supla", "Parsed SDP: call_id=%u size=%u",
-                 (unsigned)sdp.call_id, (unsigned)sdp.data_size);
-
-        if (sdp.call_id == SUPLA_SD_CALL_REGISTER_DEVICE_RESULT ) {
-
-          if (sdp.data_size >= sizeof(TSD_SuplaRegisterDeviceResult)) {
-
-            TSD_SuplaRegisterDeviceResult res;
-            memcpy(&res, sdp.data, sizeof(res));
-
-            ESP_LOGI("supla",
-                     "Register result: code=%d timeout=%u version=%u min=%u",
-                     res.result_code, res.activity_timeout,
-                     res.version, res.version_min);
-
-            if (res.result_code == SUPLA_RESULT_TRUE) {
-              registered_ = true;
-              ESP_LOGI("supla", "Device registered successfully");
-              return true;
-            }
-
-           // registered_ = false;
-            ESP_LOGW("supla", "Registration failed, code=%d", res.result_code);
-            return false;
-          } else {
-            ESP_LOGW("supla", "Register result SDP too small: %u",
-                     (unsigned)sdp.data_size);
-          }
-        }
-      }
-    }
     yield();
-    delay(5);
+    delay(1);
+
+
+    }
   }
 
   ESP_LOGW("supla", "Timeout waiting for register response");
