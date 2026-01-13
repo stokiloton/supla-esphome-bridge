@@ -115,7 +115,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   //reg.LocationPWD[SUPLA_LOCATION_PWD_MAXSIZE - 1] = '\0';
 
   // EMAIL
-  strncpy(reg.Email, "stokiloton@gmail.com", SUPLA_EMAIL_MAXSIZE - 1);
+  strncpy(reg.Email, "stokiloton@gmail.com", SUPLA_EMAIL_MAXSIZE);
   //reg.Email[SUPLA_EMAIL_MAXSIZE - 1] = '\0';
 
   // AUTHKEY (16 bytes, stały)
@@ -136,15 +136,15 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   memcpy(reg.GUID, GUID_BIN, SUPLA_GUID_SIZE);
 
   // Name
-  strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE - 1);
+  strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE);
   //reg.Name[SUPLA_DEVICE_NAME_MAXSIZE - 1] = '\0';
 
   // SoftVer
-  strncpy(reg.SoftVer, "GGv1", SUPLA_SOFTVER_MAXSIZE - 1);
+  strncpy(reg.SoftVer, "2.0", SUPLA_SOFTVER_MAXSIZE);
   //reg.SoftVer[SUPLA_SOFTVER_MAXSIZE - 1] = '\0';
 
   // ServerName
-  strncpy(reg.ServerName, server_.c_str(), SUPLA_SERVER_NAME_MAXSIZE - 1);
+  strncpy(reg.ServerName, server_.c_str(), SUPLA_SERVER_NAME_MAXSIZE);
   //reg.ServerName[SUPLA_SERVER_NAME_MAXSIZE - 1] = '\0';
   
   // Flags, ManufacturerID, ProductID
@@ -338,8 +338,8 @@ void SuplaEsphomeBridge::fill_channel_D(
 
     // Wartość początkowa
     if (initial_value) {
-        strncpy(ch.value, initial_value, SUPLA_CHANNELVALUE_SIZE - 1);
-        ch.value[SUPLA_CHANNELVALUE_SIZE - 1] = '\0';
+        strncpy(ch.value, initial_value, SUPLA_CHANNELVALUE_SIZE);
+        //ch.value[SUPLA_CHANNELVALUE_SIZE - 1] = '\0';
     }
 
     // Ikona domyślna (np. SUPLA_ICON_RELAY)
