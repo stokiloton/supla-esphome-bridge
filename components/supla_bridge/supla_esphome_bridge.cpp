@@ -3,11 +3,6 @@
 #include <cstring>
 #include <cstdint>
 
-#ifndef SUPLA_PROTO_VERSION
-#define SUPLA_PROTO_VERSION 23
-#endif
-
-
 
 namespace supla_esphome_bridge {
 
