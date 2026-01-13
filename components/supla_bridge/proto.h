@@ -820,6 +820,9 @@ typedef struct {
       channels[SUPLA_CHANNELMAXCOUNT];  // Last variable in struct!
 } TDS_SuplaRegisterDevice;
 
+
+
+#pragma pack(push, 1)
 typedef struct {
   // device -> server
 
@@ -831,6 +834,9 @@ typedef struct {
 
   char value[SUPLA_CHANNELVALUE_SIZE];
 } TDS_SuplaDeviceChannel_B;  // ver. >= 2
+#pragma pack(pod)
+
+
 
 typedef struct {
   unsigned char relatedChannelNumber;  // ChannelNumber + 1.
@@ -1017,6 +1023,9 @@ typedef struct {
       channels[SUPLA_CHANNELMAXCOUNT];  // Last variable in struct!
 } TDS_SuplaRegisterDevice_B;            // ver. >= 2
 
+
+
+#pragma pack(push, 1)
 typedef struct {
   // device -> server
 
@@ -1034,6 +1043,7 @@ typedef struct {
   TDS_SuplaDeviceChannel_B
       channels[SUPLA_CHANNELMAXCOUNT];  // Last variable in struct!
 } TDS_SuplaRegisterDevice_C;            // ver. >= 6
+#pragma pack(pop)
 
 typedef struct {
   // device -> server
