@@ -163,23 +163,9 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   delay(1);
 
 
-  reg.channel_count = 1;
-
-  TDS_SuplaDeviceChannel_D &ch = reg.channels[0];
+  reg.channel_count = 0;
 
 
-fill_channel_D(
-    ch,
-    0,                                  // Number
-    SUPLA_CHANNELTYPE_RELAY,            // Type
-    SUPLA_CHANNELFNC_POWERSWITCH,       // FuncList
-    0,                                  // Default
-    0,                                  // Flags
-    false,                              // Offline
-    0,                                  // ValueValidityTimeSec
-    "0",                                // initial value
-    0                    // DefaultIcon
-);
 
   
 
