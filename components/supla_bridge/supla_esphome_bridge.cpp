@@ -122,7 +122,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   //reg.LocationPWD[SUPLA_LOCATION_PWD_MAXSIZE - 1] = '\0';
 
   // EMAIL
-  strncpy(reg.Email, "stokiloton@gmail.com", SUPLA_EMAIL_MAXSIZE);
+  strncpy(reg.Email, "stokiloton@gmail.com", SUPLA_EMAIL_MAXSIZE - 1);
   //reg.Email[SUPLA_EMAIL_MAXSIZE - 1] = '\0';
 
   // AUTHKEY (16 bytes, stały)
@@ -143,15 +143,15 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   memcpy(reg.GUID, GUID_BIN, SUPLA_GUID_SIZE);
 
   // Name
-  strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE);
+  strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE - 1);
   //reg.Name[SUPLA_DEVICE_NAME_MAXSIZE - 1] = '\0';
 
   // SoftVer
-  strncpy(reg.SoftVer, "2.0", SUPLA_SOFTVER_MAXSIZE);
+  strncpy(reg.SoftVer, "2.0", SUPLA_SOFTVER_MAXSIZE - 1);
   //reg.SoftVer[SUPLA_SOFTVER_MAXSIZE - 1] = '\0';
 
   // ServerName
-  strncpy(reg.ServerName, server_.c_str(), SUPLA_SERVER_NAME_MAXSIZE);
+  strncpy(reg.ServerName, server_.c_str(), SUPLA_SERVER_NAME_MAXSIZE - 1);
   //reg.ServerName[SUPLA_SERVER_NAME_MAXSIZE - 1] = '\0';
   
   // Flags, ManufacturerID, ProductID
@@ -171,7 +171,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   ch.Number = 0;
   ch.Type = SUPLA_CHANNELTYPE_THERMOMETER;
   ch.FuncList = SUPLA_BIT_FUNC_THERMOMETER;
-  ch.Default = 0;
+  ch.Default = 1;
   ch.Flags = 0;
   ch.Offline = 0;
   ch.ValueValidityTimeSec = 0;
