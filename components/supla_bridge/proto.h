@@ -16,6 +16,8 @@
  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
 
+#defined ESP8266
+
 #ifndef supla_proto_H_
 #define supla_proto_H_
 
@@ -822,7 +824,7 @@ typedef struct {
 
 
 
-#pragma pack(push, 1)
+//#pragma pack(push, 1)
 typedef struct {
   // device -> server
 
@@ -834,7 +836,7 @@ typedef struct {
 
   char value[SUPLA_CHANNELVALUE_SIZE];
 } TDS_SuplaDeviceChannel_B;  // ver. >= 2
-#pragma pack(pop)
+//#pragma pack(pop)
 
 
 
@@ -1025,7 +1027,7 @@ typedef struct {
 
 
 
-#pragma pack(push, 1)
+//#pragma pack(push, 1)
 typedef struct {
   // device -> server
 
@@ -1043,7 +1045,7 @@ typedef struct {
   TDS_SuplaDeviceChannel_B
       channels[SUPLA_CHANNELMAXCOUNT];  // Last variable in struct!
 } TDS_SuplaRegisterDevice_C;            // ver. >= 6
-#pragma pack(pop)
+//#pragma pack(pop)
 
 typedef struct {
   // device -> server
