@@ -95,34 +95,34 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   yield();
   delay(1);
   
-  const unsigned call_id = SUPLA_DS_CALL_REGISTER_DEVICE_G;
-  ESP_LOGI("supla", "Attempting register with call_id=%u (REGISTER_DEVICE_G)", call_id);
+  const unsigned call_id = SUPLA_DS_CALL_REGISTER_DEVICE_C;
+  ESP_LOGI("supla", "Attempting register with call_id=%u", call_id);
 
   // -------------------------
-  // Build TDS_SuplaRegisterDevice_G
+  // Build TDS_SuplaRegisterDevice_..
   // -------------------------
-  static TDS_SuplaRegisterDevice_G reg;
+  static TDS_SuplaRegisterDevice_C reg;
   memset(&reg, 0, sizeof(reg));
 
   yield();
   delay(1);
 
   // LocationID / LocationPWD
- // reg.LocationID = location_id_;
+  reg.LocationID = location_id_;
 
- // strncpy(reg.LocationPWD, location_password_.c_str(), SUPLA_LOCATION_PWD_MAXSIZE - 1);
-  //reg.LocationPWD[SUPLA_LOCATION_PWD_MAXSIZE - 1] = '\0';
+ strncpy(reg.LocationPWD, location_password_.c_str(), SUPLA_LOCATION_PWD_MAXSIZE - 1);
+  reg.LocationPWD[SUPLA_LOCATION_PWD_MAXSIZE - 1] = '\0';
 
   // EMAIL
-  strncpy(reg.Email, "stokiloton@gmail.com", SUPLA_EMAIL_MAXSIZE - 1);
-  reg.Email[SUPLA_EMAIL_MAXSIZE - 1] = '\0';
+  //strncpy(reg.Email, "stokiloton@gmail.com", SUPLA_EMAIL_MAXSIZE - 1);
+  //reg.Email[SUPLA_EMAIL_MAXSIZE - 1] = '\0';
 
   // AUTHKEY (16 bytes, stały)
   static const uint8_t AUTHKEY[SUPLA_AUTHKEY_SIZE] = {
     0xA3,0x5F,0x91,0x0C,0x67,0x2B,0x4E,0x88,
     0x19,0xC4,0x5A,0x0D,0x6E,0x3F,0x12,0x99
   };
-  memcpy(reg.AuthKey, AUTHKEY, SUPLA_AUTHKEY_SIZE);
+ // memcpy(reg.AuthKey, AUTHKEY, SUPLA_AUTHKEY_SIZE);
   
 
   // GUID: 1C81FE5A-DDDD-BCD1-FCC1-0F42C159618E
@@ -147,15 +147,25 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   reg.ServerName[SUPLA_SERVER_NAME_MAXSIZE - 1] = '\0';
   
   // Flags, ManufacturerID, ProductID
-  reg.Flags = 0;
-  reg.ManufacturerID = 0;
-  reg.ProductID = 0;
+  //reg.Flags = 0;
+  //reg.ManufacturerID = 0;
+  //reg.ProductID = 0;
 
   yield();
   delay(1);
 
 
   reg.channel_count = 1;
+
+  TDS_SuplaDeviceChannel_B &ch = reg.channels[0];
+   memset(&ch, 0, sizeof(ch));
+
+  ch.Number = 0;
+  ch.Type = SUPLA_CHANNELTYPE_THERMOMETER;
+  ch.FuncList = SUPLA_BIT_FUNC_THERMOMETER;
+  ch.Default = 1;
+  memset(ch.value, 0, SUPLA_CHANNELVALUE_SIZE);
+
 
 //  TDS_SuplaDeviceChannel_E &ch = reg.channels[0];
  // memset(&ch, 0, sizeof(ch));
@@ -180,10 +190,10 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   delay(1);
 
   size_t payload_size =
-      offsetof(TDS_SuplaRegisterDevice_G, channels) +
-      reg.channel_count * sizeof(TDS_SuplaDeviceChannel_E);
+      offsetof(TDS_SuplaRegisterDevice_C, channels) +
+      reg.channel_count * sizeof(TDS_SuplaDeviceChannel_B);
 
-  ESP_LOGI("supla", "Prepared REGISTER_DEVICE_G payload_size=%u (channel_count=%u)",
+  ESP_LOGI("supla", "Prepared REGISTER_DEVICE payload_size=%u (channel_count=%u)",
            (unsigned)payload_size, (unsigned)reg.channel_count);
 
   yield();
@@ -213,7 +223,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   yield();
   delay(1);
 
-  size_t dat_size = sizeof(TDS_SuplaRegisterDevice_G);
+  size_t dat_size = sizeof(TDS_SuplaRegisterDevice_C);
   
   ESP_LOGI("supla", "SUPLA_MAX_DATA_SIZE=%u , payload_size=%u, dat_size=%u  ", SUPLA_MAX_DATA_SIZE, payload_size, dat_size);
   
