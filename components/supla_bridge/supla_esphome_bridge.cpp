@@ -155,7 +155,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   delay(1);
 
 
-  reg.channel_count = 1;
+  reg.channel_count = 0;
 
 //  TDS_SuplaDeviceChannel_E &ch = reg.channels[0];
  // memset(&ch, 0, sizeof(ch));
