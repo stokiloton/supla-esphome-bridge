@@ -834,7 +834,7 @@ typedef struct {
 
   char value[SUPLA_CHANNELVALUE_SIZE];
 } TDS_SuplaDeviceChannel_B;  // ver. >= 2
-#pragma pack(pod)
+#pragma pack(pop)
 
 
 
