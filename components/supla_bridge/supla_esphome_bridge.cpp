@@ -95,13 +95,13 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   yield();
   delay(1);
   
-  const unsigned call_id = SUPLA_DS_CALL_REGISTER_DEVICE_F;
-  ESP_LOGI("supla", "Attempting register with call_id=%u (REGISTER_DEVICE_F)", call_id);
+  const unsigned call_id = SUPLA_DS_CALL_REGISTER_DEVICE_G;
+  ESP_LOGI("supla", "Attempting register with call_id=%u (REGISTER_DEVICE_G)", call_id);
 
   // -------------------------
-  // Build TDS_SuplaRegisterDevice_F
+  // Build TDS_SuplaRegisterDevice_G
   // -------------------------
-  static TDS_SuplaRegisterDevice_F reg;
+  static TDS_SuplaRegisterDevice_G reg;
   memset(&reg, 0, sizeof(reg));
 
   yield();
@@ -157,7 +157,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 
   reg.channel_count = 1;
 
-  TDS_SuplaDeviceChannel_D &ch = reg.channels[0];
+  TDS_SuplaDeviceChannel_E &ch = reg.channels[0];
   memset(&ch, 0, sizeof(ch));
 
   ch.Number = 0;
@@ -169,7 +169,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   ch.ValueValidityTimeSec = 0;
   memset(ch.value, 0, SUPLA_CHANNELVALUE_SIZE);
   ch.DefaultIcon = 0;
-  //ch.SubDeviceId = 0;
+  ch.SubDeviceId = 0;
 
   
 
@@ -180,10 +180,10 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   delay(1);
 
   size_t payload_size =
-      offsetof(TDS_SuplaRegisterDevice_F, channels) +
-      reg.channel_count * sizeof(TDS_SuplaDeviceChannel_D);
+      offsetof(TDS_SuplaRegisterDevice_G, channels) +
+      reg.channel_count * sizeof(TDS_SuplaDeviceChannel_E);
 
-  ESP_LOGI("supla", "Prepared REGISTER_DEVICE_F payload_size=%u (channel_count=%u)",
+  ESP_LOGI("supla", "Prepared REGISTER_DEVICE_G payload_size=%u (channel_count=%u)",
            (unsigned)payload_size, (unsigned)reg.channel_count);
 
   yield();
@@ -213,7 +213,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   yield();
   delay(1);
 
-  size_t dat_size = sizeof(TDS_SuplaRegisterDevice_F);
+  size_t dat_size = sizeof(TDS_SuplaRegisterDevice_G);
   
   ESP_LOGI("supla", "SUPLA_MAX_DATA_SIZE=%u , payload_size=%u, dat_size=%u  ", SUPLA_MAX_DATA_SIZE, payload_size, dat_size);
   
@@ -228,7 +228,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   size_t packet_len =
       sizeof(TSuplaDataPacket) - SUPLA_MAX_DATA_SIZE + sdp->data_size;
 
-  ESP_LOGI("supla", "Sending RAW REGISTER_DEVICE_F (call_id=%u), len=%u",
+  ESP_LOGI("supla", "Sending RAW REGISTER_DEVICE_G (call_id=%u), len=%u",
            call_id, (unsigned)packet_len);
 
   yield();
@@ -262,7 +262,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
     return false;
   }
 
-  ESP_LOGI("supla", "REGISTER_DEVICE_F sent");
+  ESP_LOGI("supla", "REGISTER_DEVICE_G sent");
 
   yield();
   delay(1);
