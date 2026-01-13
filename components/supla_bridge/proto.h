@@ -16,7 +16,7 @@
  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
 
-#defined ESP8266
+#define ESP8266
 
 #ifndef supla_proto_H_
 #define supla_proto_H_
