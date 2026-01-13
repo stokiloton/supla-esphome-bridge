@@ -96,6 +96,18 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
   yield();
   delay(1);
   
+  sproto_ctx_ = sproto_init();
+  if (sproto_ctx_) {
+    sproto_set_version(sproto_ctx_, SUPLA_PROTO_VERSION);
+    ESP_LOGI("supla", "sproto initialized, forced proto version=%u",
+             (unsigned)SUPLA_PROTO_VERSION);
+  } else {
+    ESP_LOGW("supla", "sproto_init failed");
+  }
+
+  yield();
+  delay(1);
+  
   const unsigned call_id = SUPLA_DS_CALL_REGISTER_DEVICE_F;
   ESP_LOGI("supla", "Attempting register with call_id=%u (REGISTER_DEVICE_F)", call_id);
 
@@ -175,20 +187,6 @@ fill_channel_D(
 );
 
   
-  //memset(&ch, 0, sizeof(ch));
-
-  //ch.Number = 0;
-  //ch.Type = SUPLA_CHANNELTYPE_THERMOMETER;
-  //ch.FuncList = SUPLA_BIT_FUNC_THERMOMETER;
-  //ch.Default = 0;
-  
-  //ch.Flags = 0;
-  //ch.Offline = 0;
-  //ch.ValueValidityTimeSec = 0;
-  
-  //memset(ch.value, 0, SUPLA_CHANNELVALUE_SIZE);
-  //ch.DefaultIcon = 0;
-  //ch.SubDeviceId = 0;
 
   // -------------------------
   // Payload size
