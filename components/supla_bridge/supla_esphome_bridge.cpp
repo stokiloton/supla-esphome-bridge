@@ -115,7 +115,7 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 
   // EMAIL
   strncpy(reg.Email, "stokiloton@gmail.com", SUPLA_EMAIL_MAXSIZE - 1);
-  reg.Email[SUPLA_EMAIL_MAXSIZE] = '\0';
+  reg.Email[SUPLA_EMAIL_MAXSIZE - 1] = '\0';
 
   // AUTHKEY (16 bytes, stały)
   static const uint8_t AUTHKEY[SUPLA_AUTHKEY_SIZE] = {
@@ -136,15 +136,15 @@ bool SuplaEsphomeBridge::register_device(unsigned long timeout_ms) {
 
   // Name
   strncpy(reg.Name, device_name_.c_str(), SUPLA_DEVICE_NAME_MAXSIZE - 1);
-  reg.Name[SUPLA_DEVICE_NAME_MAXSIZE] = '\0';
+  reg.Name[SUPLA_DEVICE_NAME_MAXSIZE - 1] = '\0';
 
   // SoftVer
   strncpy(reg.SoftVer, "2.0", SUPLA_SOFTVER_MAXSIZE - 1);
-  reg.SoftVer[SUPLA_SOFTVER_MAXSIZE] = '\0';
+  reg.SoftVer[SUPLA_SOFTVER_MAXSIZE - 1] = '\0';
 
   // ServerName
   strncpy(reg.ServerName, server_.c_str(), SUPLA_SERVER_NAME_MAXSIZE - 1);
-  reg.ServerName[SUPLA_SERVER_NAME_MAXSIZE] = '\0';
+  reg.ServerName[SUPLA_SERVER_NAME_MAXSIZE - 1] = '\0';
   
   // Flags, ManufacturerID, ProductID
   reg.Flags = 0;
