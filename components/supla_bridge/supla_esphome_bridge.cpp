@@ -9,14 +9,6 @@ namespace supla_esphome_bridge {
 
 
 SuplaEsphomeBridge::SuplaEsphomeBridge() {
-  sproto_ctx_ = sproto_init();
-  if (sproto_ctx_) {
-    sproto_set_version(sproto_ctx_, SUPLA_PROTO_VERSION);
-    ESP_LOGI("supla", "sproto initialized, forced proto version=%u",
-             (unsigned)SUPLA_PROTO_VERSION);
-  } else {
-    ESP_LOGW("supla", "sproto_init failed");
-  }
 }
 
 SuplaEsphomeBridge::~SuplaEsphomeBridge() {
