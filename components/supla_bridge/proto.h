@@ -119,7 +119,8 @@ extern char sproto_tag[SUPLA_TAG_SIZE];
 // CS  - client -> server
 // SC  - server -> client
 
-#define SUPLA_PROTO_VERSION 28
+//#define SUPLA_PROTO_VERSION 28
+#define SUPLA_PROTO_VERSION 6
 #define SUPLA_PROTO_VERSION_MIN 1
 
 #if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO) || defined(SUPLA_DEVICE)
